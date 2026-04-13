@@ -21,9 +21,27 @@ The app works without keys for light use. For higher rate limits, request a free
 
 Install `app/build/outputs/apk/debug/app-debug.apk` on your device.
 
-## CI
+## CI and installable APK
 
 GitHub Actions builds a debug APK on each push and uploads it as a workflow artifact (`tminus-debug-apk`).
+
+To publish an APK users can install from the **Releases** page, create a tag (for example `v0.1.0`) and push it; the [release workflow](.github/workflows/release-apk.yml) attaches `app-debug.apk` to that release.
+
+### Create the GitHub repository (owner: saarhaber)
+
+This environment cannot create repositories under your personal account. On your machine, with the [GitHub CLI](https://cli.github.com/) logged in as `saarhaber`:
+
+```bash
+cd /path/to/Tminus
+gh repo create saarhaber/Tminus --public --source=. --remote=origin --push
+```
+
+Or create an empty repo named `Tminus` on GitHub, then:
+
+```bash
+git remote add origin https://github.com/saarhaber/Tminus.git
+git push -u origin main
+```
 
 ## License
 
