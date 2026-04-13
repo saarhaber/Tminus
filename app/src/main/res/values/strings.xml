@@ -10,6 +10,8 @@
     <string name="home_title">Tminus</string>
     <string name="home_body">Add the MBTA Trip widget from your home screen, then pick from and to stops. Set up daily commutes for leave-time and arrival notifications. Use Settings for API keys if you need higher rate limits.</string>
     <string name="home_commutes_button">Commutes &amp; notifications</string>
+    <string name="home_last_train_button">Last / first train alerts</string>
+    <string name="home_access_button">Elevator &amp; station alerts</string>
     <string name="home_hint_tabs">Use the bar below for roadmap ideas and settings—more features will land here over time.</string>
 
     <string name="commute_list_title">Commutes</string>
@@ -52,6 +54,40 @@
     <string name="notif_leave_body">%1$s · %2$s from %3$s — departs in ~%4$d min</string>
     <string name="notif_arrival_title">Arriving</string>
     <string name="notif_arrival_body">%1$s — nearing %2$s (scheduled)</string>
+    <string name="notif_last_train_title">Last train reminder</string>
+    <string name="notif_first_train_title">First train reminder</string>
+    <string name="notif_last_train_body">%1$s · %2$s — dep. ~%3$s (scheduled)</string>
+    <string name="notif_accessibility_title">Station accessibility alert</string>
+    <string name="notif_accessibility_body">%1$s: %2$s</string>
+
+    <string name="stop_search_hint">Search stops…</string>
+
+    <string name="last_train_list_title">Last / first train</string>
+    <string name="last_train_add">Add alert</string>
+    <string name="last_train_list_empty">No alerts yet. Add one for the last train home or the first train of the morning—notifications use scheduled times from the MBTA API.</string>
+    <string name="last_train_editor_title">Train time alert</string>
+    <string name="last_train_help">Pick route, direction (0 or 1), and stop. For “last train,” we take the latest scheduled departure in the evening window. For “first train,” the earliest in the morning window. Direction IDs match the MBTA API (check trip headsigns in the official app if unsure).</string>
+    <string name="last_train_name">Name</string>
+    <string name="last_train_route">Route id (e.g. Orange, Red, CR-Lowell)</string>
+    <string name="last_train_direction">Direction id</string>
+    <string name="last_train_mode_label">Mode</string>
+    <string name="last_train_mode_last">Last train</string>
+    <string name="last_train_mode_first">First train</string>
+    <string name="last_train_stop_picked">Stop: %1$s</string>
+    <string name="last_train_notify_before">Notify this many minutes before departure</string>
+    <string name="last_train_window_start_min">Last train: window start (minutes from midnight)</string>
+    <string name="last_train_window_end_min">Last train: window end (minutes from midnight)</string>
+    <string name="last_train_first_window_start">First train: window start (minutes from midnight)</string>
+    <string name="last_train_first_window_end">First train: window end (minutes from midnight)</string>
+
+    <string name="access_list_title">Accessibility alerts</string>
+    <string name="access_add">Add watch</string>
+    <string name="access_list_empty">Watch a route and station: when MBTA posts elevator or escalator alerts whose text matches that station, you get notified.</string>
+    <string name="access_editor_title">Accessibility watch</string>
+    <string name="access_name">Name</string>
+    <string name="access_route">Route id</string>
+    <string name="access_stop_picked">Station: %1$s</string>
+    <string name="access_help">We fetch active alerts for the route and notify when the alert mentions your station (by name). Not every outage is tagged to a stop id—check mbta.com for full detail.</string>
 
     <string name="roadmap_intro">Current capabilities and ideas for the future. Nothing here is a promise; it is a living list as the project grows.</string>
     <string name="roadmap_section_in_app">In the app today</string>
@@ -59,8 +95,10 @@
     <string name="roadmap_feature_api_keys">Optional MBTA V3 and GTFS Realtime key fields</string>
     <string name="roadmap_feature_roadmap_screen">This roadmap screen</string>
     <string name="roadmap_feature_commutes">Multiple saved commutes with leave and arrival notifications (schedule-based)</string>
+    <string name="roadmap_feature_last_first_train">Last / first train reminders (scheduled departures in a time window)</string>
+    <string name="roadmap_feature_accessibility">Route-level elevator &amp; escalator alerts matched to your station name</string>
     <string name="roadmap_section_planned">Planned or under consideration</string>
-    <string name="roadmap_feature_notifications">Departure reminders and “train leaving soon” notifications</string>
+    <string name="roadmap_feature_notifications">Finer-grained or prediction-based reminders (beyond schedules)</string>
     <string name="roadmap_feature_alerts">Service alerts and elevator outages near your trip</string>
     <string name="roadmap_feature_predictions">Live predictions in the widget (not only schedules)</string>
     <string name="roadmap_feature_favorites">Saved stops and commute presets</string>

@@ -36,6 +36,8 @@ public fun RoadmapScreen(modifier: Modifier = Modifier) {
                     R.string.roadmap_feature_trip_widget,
                     R.string.roadmap_feature_api_keys,
                     R.string.roadmap_feature_commutes,
+                    R.string.roadmap_feature_last_first_train,
+                    R.string.roadmap_feature_accessibility,
                     R.string.roadmap_feature_roadmap_screen,
                 ),
         )

@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.saarlabs.tminus.commute.worker.CommuteNotificationWorker
+import com.saarlabs.tminus.commute.worker.TminusNotificationWorker
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -46,11 +46,11 @@ internal class CommuteRepository(private val context: Context) {
 
     private fun scheduleWorker() {
         val work =
-            PeriodicWorkRequestBuilder<CommuteNotificationWorker>(15, TimeUnit.MINUTES)
+            PeriodicWorkRequestBuilder<TminusNotificationWorker>(15, TimeUnit.MINUTES)
                 .build()
         WorkManager.getInstance(context)
             .enqueueUniquePeriodicWork(
-                CommuteNotificationWorker.UNIQUE_NAME,
+                TminusNotificationWorker.UNIQUE_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 work,
             )
@@ -59,11 +59,11 @@ internal class CommuteRepository(private val context: Context) {
     companion object {
         fun ensureWorkerScheduled(context: Context) {
             val work =
-                PeriodicWorkRequestBuilder<CommuteNotificationWorker>(15, TimeUnit.MINUTES)
+                PeriodicWorkRequestBuilder<TminusNotificationWorker>(15, TimeUnit.MINUTES)
                     .build()
             WorkManager.getInstance(context)
                 .enqueueUniquePeriodicWork(
-                    CommuteNotificationWorker.UNIQUE_NAME,
+                    TminusNotificationWorker.UNIQUE_NAME,
                     ExistingPeriodicWorkPolicy.KEEP,
                     work,
                 )

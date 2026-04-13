@@ -6,6 +6,7 @@ import com.mbta.tid.mbta_app.model.RouteType
 import com.mbta.tid.mbta_app.model.Stop
 import com.mbta.tid.mbta_app.model.Trip
 import com.mbta.tid.mbta_app.model.response.ApiResult
+import com.mbta.tid.mbta_app.model.response.DepartureLookupResult
 import com.mbta.tid.mbta_app.model.response.GlobalData
 import com.mbta.tid.mbta_app.model.response.ScheduleResponse
 import com.mbta.tid.mbta_app.utils.EasternTimeInstant
@@ -310,6 +311,120 @@ public class MbtaV3Client(private val apiKey: String?) {
 
         return ApiResult.Ok(ScheduleResponse(schedules = schedules, trips = trips))
     }
+
+    /**
+     * Active alerts for a route (paginated). Used for elevator / accessibility watches.
+     */
+    public suspend fun fetchAlertsForRoute(routeId: String): ApiResult<List<com.mbta.tid.mbta_app.model.response.MbtaAlertSummary>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val out = mutableListOf<com.mbta.tid.mbta_app.model.response.MbtaAlertSummary>()
+                paginateJsonApi(
+                    path = "alerts",
+                    configure = {
+                        parameter("filter[route]", routeId)
+                        parameter("page[limit]", "50")
+                    },
+                ) { doc ->
+                    for (el in doc["data"]?.jsonArray.orEmpty()) {
+                        val o = el.jsonObject
+                        if (o["type"]?.jsonPrimitive?.content != "alert") continue
+                        val id = o["id"]?.jsonPrimitive?.content ?: continue
+                        val attrs = o["attributes"]?.jsonObject ?: continue
+                        val header = attrs["header"]?.jsonPrimitive?.content ?: continue
+                        val effect = attrs["effect"]?.jsonPrimitive?.content
+                        out.add(
+                            com.mbta.tid.mbta_app.model.response.MbtaAlertSummary(
+                                id = id,
+                                header = header,
+                                effect = effect,
+                            ),
+                        )
+                    }
+                }
+                ApiResult.Ok(out)
+            } catch (e: Throwable) {
+                ApiResult.Error(message = e.message ?: e.toString())
+            }
+        }
+
+    /**
+     * Latest scheduled departure at [stopId] for [routeId] in [directionId] within [minTime]–[maxTime] (HH:mm ET).
+     */
+    public suspend fun fetchLastDepartureInWindow(
+        routeId: String,
+        directionId: Int,
+        stopId: String,
+        minTime: String,
+        maxTime: String,
+    ): ApiResult<DepartureLookupResult> =
+        withContext(Dispatchers.IO) {
+            try {
+                val doc =
+                    httpClient
+                        .get("schedules") {
+                            parameter("filter[route]", routeId)
+                            parameter("filter[direction_id]", directionId.toString())
+                            parameter("filter[stop]", stopId)
+                            parameter("filter[min_time]", minTime)
+                            parameter("filter[max_time]", maxTime)
+                            parameter("page[limit]", "500")
+                        }
+                        .body<JsonObject>()
+                var latest: EasternTimeInstant? = null
+                for (el in doc["data"]?.jsonArray.orEmpty()) {
+                    val attrs = el.jsonObject["attributes"]?.jsonObject ?: continue
+                    val depStr =
+                        attrs["departure_time"]?.jsonPrimitive?.content
+                            ?: attrs["arrival_time"]?.jsonPrimitive?.content
+                            ?: continue
+                    val et = EasternTimeInstant(Instant.parse(depStr))
+                    if (latest == null || et > latest) latest = et
+                }
+                ApiResult.Ok(DepartureLookupResult(latest))
+            } catch (e: Throwable) {
+                ApiResult.Error(message = e.message ?: e.toString())
+            }
+        }
+
+    /**
+     * Earliest scheduled departure in window (for first-train style alerts).
+     */
+    public suspend fun fetchFirstDepartureInWindow(
+        routeId: String,
+        directionId: Int,
+        stopId: String,
+        minTime: String,
+        maxTime: String,
+    ): ApiResult<DepartureLookupResult> =
+        withContext(Dispatchers.IO) {
+            try {
+                val doc =
+                    httpClient
+                        .get("schedules") {
+                            parameter("filter[route]", routeId)
+                            parameter("filter[direction_id]", directionId.toString())
+                            parameter("filter[stop]", stopId)
+                            parameter("filter[min_time]", minTime)
+                            parameter("filter[max_time]", maxTime)
+                            parameter("page[limit]", "500")
+                        }
+                        .body<JsonObject>()
+                var earliest: EasternTimeInstant? = null
+                for (el in doc["data"]?.jsonArray.orEmpty()) {
+                    val attrs = el.jsonObject["attributes"]?.jsonObject ?: continue
+                    val depStr =
+                        attrs["departure_time"]?.jsonPrimitive?.content
+                            ?: attrs["arrival_time"]?.jsonPrimitive?.content
+                            ?: continue
+                    val et = EasternTimeInstant(Instant.parse(depStr))
+                    if (earliest == null || et < earliest) earliest = et
+                }
+                ApiResult.Ok(DepartureLookupResult(earliest))
+            } catch (e: Throwable) {
+                ApiResult.Error(message = e.message ?: e.toString())
+            }
+        }
 
     private suspend inline fun paginateJsonApi(
         path: String,

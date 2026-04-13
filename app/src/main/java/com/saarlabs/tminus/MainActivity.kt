@@ -34,8 +34,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.saarlabs.tminus.ui.AccessibilityEditorRoute
+import com.saarlabs.tminus.ui.AccessibilityListScreen
 import com.saarlabs.tminus.ui.CommuteEditorRoute
 import com.saarlabs.tminus.ui.CommuteListScreen
+import com.saarlabs.tminus.ui.LastTrainEditorRoute
+import com.saarlabs.tminus.ui.LastTrainListScreen
 import com.saarlabs.tminus.ui.RoadmapScreen
 import com.saarlabs.tminus.ui.SettingsContent
 
@@ -75,6 +79,20 @@ public class MainActivity : ComponentActivity() {
                             val id = entry.arguments?.getString("profileId") ?: "new"
                             CommuteEditorRoute(navController = rootNav, profileId = id)
                         }
+                        composable(ROUTE_LAST_TRAIN_LIST) {
+                            LastTrainListScreen(navController = rootNav)
+                        }
+                        composable("$ROUTE_LAST_TRAIN_EDIT/{profileId}") { entry ->
+                            val id = entry.arguments?.getString("profileId") ?: "new"
+                            LastTrainEditorRoute(navController = rootNav, profileId = id)
+                        }
+                        composable(ROUTE_ACCESS_LIST) {
+                            AccessibilityListScreen(navController = rootNav)
+                        }
+                        composable("$ROUTE_ACCESS_EDIT/{id}") { entry ->
+                            val id = entry.arguments?.getString("id") ?: "new"
+                            AccessibilityEditorRoute(navController = rootNav, id = id)
+                        }
                     }
                 }
             }
@@ -85,6 +103,10 @@ public class MainActivity : ComponentActivity() {
         public const val ROUTE_MAIN_TABS: String = "main_tabs"
         public const val ROUTE_COMMUTE_LIST: String = "commute_list"
         public const val ROUTE_COMMUTE_EDIT: String = "commute_edit"
+        public const val ROUTE_LAST_TRAIN_LIST: String = "last_train_list"
+        public const val ROUTE_LAST_TRAIN_EDIT: String = "last_train_edit"
+        public const val ROUTE_ACCESS_LIST: String = "access_list"
+        public const val ROUTE_ACCESS_EDIT: String = "access_edit"
     }
 }
 
@@ -148,6 +170,12 @@ private fun TminusApp(
                     onOpenCommutes = {
                         rootNavController.navigate(MainActivity.ROUTE_COMMUTE_LIST)
                     },
+                    onOpenLastTrain = {
+                        rootNavController.navigate(MainActivity.ROUTE_LAST_TRAIN_LIST)
+                    },
+                    onOpenAccessibility = {
+                        rootNavController.navigate(MainActivity.ROUTE_ACCESS_LIST)
+                    },
                 )
             }
             composable(MainDestination.Roadmap.route) {
@@ -165,7 +193,11 @@ private fun TminusApp(
 }
 
 @Composable
-private fun HomeTab(onOpenCommutes: () -> Unit) {
+private fun HomeTab(
+    onOpenCommutes: () -> Unit,
+    onOpenLastTrain: () -> Unit,
+    onOpenAccessibility: () -> Unit,
+) {
     Column(modifier = Modifier.padding(24.dp)) {
         Text(
             text = stringResource(R.string.home_title),
@@ -179,6 +211,14 @@ private fun HomeTab(onOpenCommutes: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Button(onClick = onOpenCommutes) {
             Text(stringResource(R.string.home_commutes_button))
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onOpenLastTrain) {
+            Text(stringResource(R.string.home_last_train_button))
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onOpenAccessibility) {
+            Text(stringResource(R.string.home_access_button))
         }
         Spacer(Modifier.height(12.dp))
         Text(
