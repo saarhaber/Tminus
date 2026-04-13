@@ -21,6 +21,10 @@ The app works without keys for light use. For higher rate limits, request a free
 
 Install `app/build/outputs/apk/debug/app-debug.apk` on your device.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report issues, submit pull requests, and set up a dev environment.
+
 ## CI and installable APK
 
 GitHub Actions builds a debug APK on each push and uploads it as a workflow artifact (`tminus-debug-apk`).
