@@ -4,6 +4,7 @@ import android.app.Application
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.network.MbtaV3Client
+import com.saarlabs.tminus.usecases.WidgetStationBoardUseCase
 import com.saarlabs.tminus.usecases.WidgetTripUseCase
 import com.saarlabs.tminus.commute.CommuteRepository
 import com.saarlabs.tminus.features.LastTrainRepository
@@ -27,11 +28,15 @@ public class TminusApplication : Application() {
         lateinit var widgetTripUseCase: WidgetTripUseCase
             private set
 
+        lateinit var widgetStationBoardUseCase: WidgetStationBoardUseCase
+            private set
+
         fun refreshNetworking() {
             val prefs = instance.getSharedPreferences(SettingsKeys.PREFS, MODE_PRIVATE)
             val v3 = prefs.getString(SettingsKeys.KEY_V3_API, null)
             val client = MbtaV3Client(v3)
             widgetTripUseCase = WidgetTripUseCase(client)
+            widgetStationBoardUseCase = WidgetStationBoardUseCase(client)
             GlobalDataStore.client = client
         }
     }
