@@ -2,14 +2,13 @@ package com.saarlabs.tminus.android.widget
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import android.content.Intent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
-import androidx.glance.action.ActionParameters
-import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -166,14 +165,11 @@ private object WidgetContent {
                         .padding(16.dp)
                         .clickable(
                             onClick =
-                                actionStartActivity(
-                                    WidgetConfigActivity::class.java,
-                                    parameters =
-                                        actionParametersOf(
-                                            ActionParameters.Key<Int>(
-                                                AppWidgetManager.EXTRA_APPWIDGET_ID
-                                            ) to appWidgetId
-                                        ),
+                                androidx.glance.appwidget.action.actionStartActivity(
+                                    Intent(context, WidgetConfigActivity::class.java).apply {
+                                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                                    },
+                                    androidx.glance.action.actionParametersOf(),
                                 )
                         ),
                 verticalAlignment = Alignment.CenterVertically,

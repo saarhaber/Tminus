@@ -12,6 +12,24 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import kotlinx.coroutines.delay
 
+/**
+ * Forces one widget instance to recompose after prefs change (e.g. configuration). Uses the same
+ * retry as [WidgetUpdateWorker] for Glance IDs that are not registered yet.
+ */
+internal suspend fun updateTripWidgetWithRetry(context: Context, appWidgetId: Int) {
+    val glanceAppWidgetManager = GlanceAppWidgetManager(context.applicationContext)
+    val widget = MBTATripWidget()
+    repeat(WidgetUpdateWorker.MAX_RETRIES) { attempt ->
+        try {
+            val glanceId = glanceAppWidgetManager.getGlanceIdBy(appWidgetId)
+            widget.update(context.applicationContext, glanceId)
+            return
+        } catch (e: IllegalArgumentException) {
+            if (attempt < WidgetUpdateWorker.MAX_RETRIES - 1) delay(WidgetUpdateWorker.RETRY_DELAY_MS)
+        }
+    }
+}
+
 public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParameters) :
     CoroutineWorker(appContext, workerParams) {
 
@@ -60,8 +78,8 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
     public companion object {
         public const val WORK_NAME: String = "WidgetUpdate"
         public const val KEY_APP_WIDGET_IDS: String = "appWidgetIds"
-        private const val MAX_RETRIES = 5
-        private const val RETRY_DELAY_MS = 300L
+        internal const val MAX_RETRIES = 5
+        internal const val RETRY_DELAY_MS = 300L
 
         /**
          * Refreshes trip widgets. Pass specific IDs after configuration, or null to update every

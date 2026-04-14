@@ -61,7 +61,6 @@ import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.R
-import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -378,45 +377,75 @@ private fun WidgetConfigScreen(
                             }
                             items(selectableStops, key = { it.id }) { stop ->
                                 val resolved = stop.resolveParent(global.stops)
+                                val fav = resolved.id in favoriteIds
                                 Row(
                                     modifier =
                                         Modifier.fillMaxWidth()
-                                            .clickable {
-                                                if (fromStop == null) {
-                                                    fromStop = resolved
-                                                    searchQuery = ""
-                                                } else {
-                                                    if (resolved.id == fromStop!!.id) {
-                                                        Toast.makeText(
-                                                                context,
-                                                                context.getString(
-                                                                    R.string.widget_select_different_stops
-                                                                ),
-                                                                Toast.LENGTH_SHORT,
-                                                            )
-                                                            .show()
-                                                    } else {
-                                                        toStop = resolved
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant,
+                                                RoundedCornerShape(8.dp),
+                                            )
+                                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            favoriteStore.toggle(resolved.id)
+                                            favoriteIds = favoriteStore.getIds()
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                            contentDescription =
+                                                context.getString(
+                                                    if (fav) R.string.stop_unfavorite else R.string.stop_favorite,
+                                                ),
+                                            tint =
+                                                if (fav) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Text(
+                                        text = resolved.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        modifier =
+                                            Modifier.weight(1f)
+                                                .clickable {
+                                                    if (fromStop == null) {
+                                                        fromStop = resolved
                                                         searchQuery = ""
-
-                                                        val fromResolved =
-                                                            global
-                                                                .getStop(fromStop!!.id)
-                                                                ?.resolveParent(global.stops)
-                                                        val toResolved =
-                                                            global
-                                                                .getStop(toStop!!.id)
-                                                                ?.resolveParent(global.stops)
-                                                        if (
-                                                            fromResolved != null && toResolved != null
-                                                        ) {
-                                                            val config =
-                                                                WidgetTripConfig(
-                                                                    fromStopId = fromResolved.id,
-                                                                    toStopId = toResolved.id,
-                                                                    fromLabel = fromResolved.name,
-                                                                    toLabel = toResolved.name,
+                                                    } else {
+                                                        if (resolved.id == fromStop!!.id) {
+                                                            Toast.makeText(
+                                                                    context,
+                                                                    context.getString(
+                                                                        R.string.widget_select_different_stops,
+                                                                    ),
+                                                                    Toast.LENGTH_SHORT,
                                                                 )
+                                                                .show()
+                                                        } else {
+                                                            toStop = resolved
+                                                            searchQuery = ""
+
+                                                            val fromResolved =
+                                                                global
+                                                                    .getStop(fromStop!!.id)
+                                                                    ?.resolveParent(global.stops)
+                                                            val toResolved =
+                                                                global
+                                                                    .getStop(toStop!!.id)
+                                                                    ?.resolveParent(global.stops)
+                                                            if (
+                                                                fromResolved != null && toResolved != null
+                                                            ) {
+                                                                val config =
+                                                                    WidgetTripConfig(
+                                                                        fromStopId = fromResolved.id,
+                                                                        toStopId = toResolved.id,
+                                                                        fromLabel = fromResolved.name,
+                                                                        toLabel = toResolved.name,
+                                                                    )
                                                             coroutineScope.launch {
                                                                 try {
                                                                     withContext(Dispatchers.IO) {
@@ -424,55 +453,46 @@ private fun WidgetConfigScreen(
                                                                             appWidgetId,
                                                                             config,
                                                                         )
-                                                                        MBTATripWidget()
-                                                                            .updateAll(
-                                                                                context.applicationContext,
-                                                                            )
                                                                     }
+                                                                    updateTripWidgetWithRetry(
+                                                                        context.applicationContext,
+                                                                        appWidgetId,
+                                                                    )
                                                                     WidgetUpdateWorker.enqueueRefresh(
                                                                         context,
                                                                         intArrayOf(appWidgetId),
                                                                     )
                                                                     onComplete()
-                                                                } catch (e: Exception) {
-                                                                    android.util.Log.e(
-                                                                        "WidgetConfig",
-                                                                        "Failed to save widget config",
-                                                                        e,
-                                                                    )
-                                                                    Toast.makeText(
-                                                                            context,
-                                                                            context.getString(
-                                                                                R.string.widget_save_error
-                                                                            ),
-                                                                            Toast.LENGTH_LONG,
+                                                                    } catch (e: Exception) {
+                                                                        android.util.Log.e(
+                                                                            "WidgetConfig",
+                                                                            "Failed to save widget config",
+                                                                            e,
                                                                         )
-                                                                        .show()
+                                                                        Toast.makeText(
+                                                                                context,
+                                                                                context.getString(
+                                                                                    R.string.widget_save_error,
+                                                                                ),
+                                                                                Toast.LENGTH_LONG,
+                                                                            )
+                                                                            .show()
+                                                                    }
                                                                 }
+                                                            } else {
+                                                                Toast.makeText(
+                                                                        context,
+                                                                        context.getString(
+                                                                            R.string.widget_save_error,
+                                                                        ),
+                                                                        Toast.LENGTH_LONG,
+                                                                    )
+                                                                    .show()
                                                             }
-                                                        } else {
-                                                            Toast.makeText(
-                                                                    context,
-                                                                    context.getString(
-                                                                        R.string.widget_save_error
-                                                                    ),
-                                                                    Toast.LENGTH_LONG,
-                                                                )
-                                                                .show()
                                                         }
                                                     }
                                                 }
-                                            }
-                                            .background(
-                                                MaterialTheme.colorScheme.surfaceVariant,
-                                                RoundedCornerShape(8.dp),
-                                            )
-                                            .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = resolved.name,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                                .padding(vertical = 8.dp, horizontal = 4.dp),
                                     )
                                 }
                             }
