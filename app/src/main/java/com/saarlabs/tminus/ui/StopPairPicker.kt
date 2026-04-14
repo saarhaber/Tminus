@@ -47,14 +47,16 @@ public fun StopPairPicker(
 ) {
     val context = LocalContext.current
     var globalResponse by remember { mutableStateOf<GlobalData?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var loadingTimeout by remember { mutableStateOf(false) }
     var reachableToStops by remember { mutableStateOf<List<Stop>?>(null) }
 
     LaunchedEffect(Unit) {
+        loadError = null
         val result = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }
         when (result) {
             is ApiResult.Ok -> globalResponse = result.data
-            is ApiResult.Error -> {}
+            is ApiResult.Error -> loadError = result.message
         }
     }
 
@@ -161,6 +163,17 @@ public fun StopPairPicker(
             )
 
             when {
+                globalResponse == null && loadError != null -> {
+                    Column {
+                        Text(stringResource(R.string.widget_loading_timeout_tminus))
+                        Text(
+                            loadError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
                 globalResponse == null && loadingTimeout -> {
                     Text(stringResource(R.string.widget_loading_timeout_tminus))
                 }

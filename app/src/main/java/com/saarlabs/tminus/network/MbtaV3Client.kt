@@ -13,7 +13,9 @@ import com.saarlabs.tminus.util.EasternTimeInstant
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.HttpRequestBuilder
@@ -22,6 +24,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.url
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Instant
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +51,7 @@ public class MbtaV3Client(private val apiKey: String?) {
 
     private val httpClient =
         HttpClient(Android) {
+            expectSuccess = true
             install(ContentNegotiation) { json(json) }
             install(HttpTimeout) {
                 requestTimeoutMillis = 30_000
@@ -96,7 +100,7 @@ public class MbtaV3Client(private val apiKey: String?) {
 
                 ApiResult.Ok(GlobalData(stops = stops, routes = routes))
             } catch (e: Throwable) {
-                ApiResult.Error(message = e.message ?: e.toString())
+                ApiResult.Error(message = describeMbtaRequestFailure(e))
             }
         }
 
@@ -189,7 +193,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                         .sortedBy { it.name },
                 )
             } catch (e: Throwable) {
-                ApiResult.Error(message = e.message ?: e.toString())
+                ApiResult.Error(message = describeMbtaRequestFailure(e))
             }
         }
 
@@ -248,7 +252,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                         .body<JsonObject>()
                 parseScheduleDocument(doc)
             } catch (e: Throwable) {
-                ApiResult.Error(message = e.message ?: e.toString())
+                ApiResult.Error(message = describeMbtaRequestFailure(e))
             }
         }
 
@@ -345,7 +349,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                 }
                 ApiResult.Ok(out)
             } catch (e: Throwable) {
-                ApiResult.Error(message = e.message ?: e.toString())
+                ApiResult.Error(message = describeMbtaRequestFailure(e))
             }
         }
 
@@ -384,7 +388,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                 }
                 ApiResult.Ok(DepartureLookupResult(latest))
             } catch (e: Throwable) {
-                ApiResult.Error(message = e.message ?: e.toString())
+                ApiResult.Error(message = describeMbtaRequestFailure(e))
             }
         }
 
@@ -423,7 +427,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                 }
                 ApiResult.Ok(DepartureLookupResult(earliest))
             } catch (e: Throwable) {
-                ApiResult.Error(message = e.message ?: e.toString())
+                ApiResult.Error(message = describeMbtaRequestFailure(e))
             }
         }
 
@@ -564,6 +568,27 @@ public class MbtaV3Client(private val apiKey: String?) {
             childStopIds = childIds,
             parentStationId = parentId,
         )
+    }
+
+    private fun describeMbtaRequestFailure(e: Throwable): String {
+        when (e) {
+            is ClientRequestException -> {
+                val status = e.response.status
+                return when (status) {
+                    HttpStatusCode.Forbidden ->
+                        "MBTA API rejected the key (403). Clear the key in Settings or paste the full key from api-v3.mbta.com."
+                    HttpStatusCode.Unauthorized ->
+                        "MBTA API unauthorized (401). Check your V3 API key in Settings."
+                    HttpStatusCode.TooManyRequests ->
+                        "MBTA API rate limit (429). Try again in a few minutes."
+                    else ->
+                        "MBTA API error ${status.value}${e.message?.let { ": $it" } ?: ""}"
+                }
+            }
+            is ResponseException ->
+                return "MBTA API error ${e.response.status.value}${e.message?.let { ": $it" } ?: ""}"
+            else -> return e.message ?: e.toString()
+        }
     }
 }
 
