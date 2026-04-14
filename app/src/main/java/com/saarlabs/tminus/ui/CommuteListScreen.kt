@@ -63,6 +63,7 @@ public fun CommuteListScreen(
     val repo = remember(context) { CommuteRepository(context) }
     var profiles by remember { mutableStateOf<List<CommuteProfile>>(emptyList()) }
     val scope = rememberCoroutineScope()
+    val use24Hour = rememberUse24HourTime()
 
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -201,7 +202,10 @@ public fun CommuteListScreen(
                                         Text(
                                             stringResource(
                                                 R.string.commute_list_summary,
-                                                formatTime(p.targetMinutesFromMidnight),
+                                                formatMinutesFromMidnight(
+                                                    p.targetMinutesFromMidnight,
+                                                    use24Hour,
+                                                ),
                                                 p.notifyLeadMinutes,
                                             ),
                                             style = MaterialTheme.typography.bodySmall,
@@ -216,10 +220,4 @@ public fun CommuteListScreen(
             }
         }
     }
-}
-
-private fun formatTime(minutesFromMidnight: Int): String {
-    val h = minutesFromMidnight / 60
-    val m = minutesFromMidnight % 60
-    return "%d:%02d".format(h, m)
 }

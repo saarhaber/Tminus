@@ -58,10 +58,11 @@ public fun LastTrainEditorScreen(
     var mode by remember { mutableStateOf(initial?.mode ?: LastTrainMode.LAST) }
     var stop by remember { mutableStateOf<Stop?>(null) }
     var notifyMin by remember { mutableStateOf((initial?.notifyMinutesBefore ?: 45).toString()) }
-    var winStart by remember { mutableStateOf((initial?.windowStartMinutes ?: 18 * 60).toString()) }
-    var winEnd by remember { mutableStateOf((initial?.windowEndMinutes ?: 23 * 60 + 59).toString()) }
-    var firstStart by remember { mutableStateOf((initial?.firstWindowStartMinutes ?: 4 * 60).toString()) }
-    var firstEnd by remember { mutableStateOf((initial?.firstWindowEndMinutes ?: 10 * 60).toString()) }
+    var winStart by remember { mutableStateOf(initial?.windowStartMinutes ?: 18 * 60) }
+    var winEnd by remember { mutableStateOf(initial?.windowEndMinutes ?: 23 * 60 + 59) }
+    var firstStart by remember { mutableStateOf(initial?.firstWindowStartMinutes ?: 4 * 60) }
+    var firstEnd by remember { mutableStateOf(initial?.firstWindowEndMinutes ?: 10 * 60) }
+    val use24Hour = rememberUse24HourTime()
     var days by remember {
         mutableStateOf((initial?.daysOfWeek ?: listOf(1, 2, 3, 4, 5, 6, 7)).toSet())
     }
@@ -191,30 +192,34 @@ public fun LastTrainEditorScreen(
 
         when (mode) {
             LastTrainMode.LAST -> {
-                OutlinedTextField(
-                    value = winStart,
-                    onValueChange = { winStart = it.filter { c -> c.isDigit() } },
-                    label = { Text(stringResource(R.string.last_train_window_start_min)) },
+                MinutesFromMidnightPickerField(
+                    minutesFromMidnight = winStart,
+                    onMinutesChange = { winStart = it },
+                    label = stringResource(R.string.last_train_window_start_min),
+                    use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = winEnd,
-                    onValueChange = { winEnd = it.filter { c -> c.isDigit() } },
-                    label = { Text(stringResource(R.string.last_train_window_end_min)) },
+                MinutesFromMidnightPickerField(
+                    minutesFromMidnight = winEnd,
+                    onMinutesChange = { winEnd = it },
+                    label = stringResource(R.string.last_train_window_end_min),
+                    use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             LastTrainMode.FIRST -> {
-                OutlinedTextField(
-                    value = firstStart,
-                    onValueChange = { firstStart = it.filter { c -> c.isDigit() } },
-                    label = { Text(stringResource(R.string.last_train_first_window_start)) },
+                MinutesFromMidnightPickerField(
+                    minutesFromMidnight = firstStart,
+                    onMinutesChange = { firstStart = it },
+                    label = stringResource(R.string.last_train_first_window_start),
+                    use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = firstEnd,
-                    onValueChange = { firstEnd = it.filter { c -> c.isDigit() } },
-                    label = { Text(stringResource(R.string.last_train_first_window_end)) },
+                MinutesFromMidnightPickerField(
+                    minutesFromMidnight = firstEnd,
+                    onMinutesChange = { firstEnd = it },
+                    label = stringResource(R.string.last_train_first_window_end),
+                    use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -253,6 +258,12 @@ public fun LastTrainEditorScreen(
         Button(
             onClick = {
                 val s = stop ?: return@Button
+                val ws = winStart.coerceIn(0, 24 * 60 - 1)
+                var we = winEnd.coerceIn(0, 24 * 60 - 1)
+                if (we <= ws) we = (ws + 1).coerceAtMost(24 * 60 - 1)
+                val fs = firstStart.coerceIn(0, 24 * 60 - 1)
+                var fe = firstEnd.coerceIn(0, 24 * 60 - 1)
+                if (fe <= fs) fe = (fs + 1).coerceAtMost(24 * 60 - 1)
                 val profile =
                     LastTrainProfile(
                         id = initial?.id ?: java.util.UUID.randomUUID().toString(),
@@ -264,10 +275,10 @@ public fun LastTrainEditorScreen(
                         mode = mode,
                         daysOfWeek = days.sorted(),
                         notifyMinutesBefore = notifyMin.toIntOrNull()?.coerceIn(5, 180) ?: 45,
-                        windowStartMinutes = winStart.toIntOrNull()?.coerceIn(0, 24 * 60) ?: 18 * 60,
-                        windowEndMinutes = winEnd.toIntOrNull()?.coerceIn(0, 24 * 60 - 1) ?: 23 * 60 + 59,
-                        firstWindowStartMinutes = firstStart.toIntOrNull()?.coerceIn(0, 24 * 60) ?: 4 * 60,
-                        firstWindowEndMinutes = firstEnd.toIntOrNull()?.coerceIn(0, 24 * 60) ?: 10 * 60,
+                        windowStartMinutes = ws,
+                        windowEndMinutes = we,
+                        firstWindowStartMinutes = fs,
+                        firstWindowEndMinutes = fe,
                         enabled = enabled,
                     )
                 onSave(profile)

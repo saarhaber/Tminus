@@ -35,6 +35,7 @@ import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.usecases.WidgetTripUseCase
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
+import com.saarlabs.tminus.SettingsKeys
 import com.saarlabs.tminus.TminusApplication
 import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.android.util.formattedTime
@@ -87,6 +88,12 @@ public class MBTATripWidget : GlanceAppWidget() {
         }
 
         val cfg = checkNotNull(config)
+        val use24Hour =
+            withContext(Dispatchers.IO) {
+                context.applicationContext
+                    .getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
+                    .getBoolean(SettingsKeys.KEY_USE_24_HOUR, false)
+            }
         val globalData =
             when (
                 val globalResult = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }
@@ -131,6 +138,7 @@ public class MBTATripWidget : GlanceAppWidget() {
                             context = context,
                             config = cfg,
                             tripData = tripData,
+                            use24Hour = use24Hour,
                         )
                     } else {
                         WidgetContent.NoTrips(context = context, config = cfg)
@@ -273,7 +281,12 @@ private object WidgetContent {
     }
 
     @androidx.compose.runtime.Composable
-    fun TripData(context: Context, config: WidgetTripConfig, tripData: WidgetTripData) {
+    fun TripData(
+        context: Context,
+        config: WidgetTripConfig,
+        tripData: WidgetTripData,
+        use24Hour: Boolean,
+    ) {
         val fromLabel = config.fromLabel.ifEmpty { tripData.fromStop.name }
         val toLabel = config.toLabel.ifEmpty { tripData.toStop.name }
         val defaultColor =
@@ -340,7 +353,7 @@ private object WidgetContent {
                 Spacer(modifier = GlanceModifier.height(4.dp))
                 Text(
                     text =
-                        "${tripData.departureTime.formattedTime()} → ${tripData.arrivalTime.formattedTime()}",
+                        "${tripData.departureTime.formattedTime(use24Hour)} → ${tripData.arrivalTime.formattedTime(use24Hour)}",
                     style = TextStyle(color = ColorProvider(deemphasizedColor)),
                 )
                 if (tripData.fromPlatform != null || tripData.toPlatform != null) {

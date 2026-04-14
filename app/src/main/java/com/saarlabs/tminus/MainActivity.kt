@@ -69,16 +69,24 @@ public class MainActivity : ComponentActivity() {
                             var settingsV3 by remember {
                                 mutableStateOf(prefs.getString(SettingsKeys.KEY_V3_API, "") ?: "")
                             }
+                            var settingsUse24Hour by remember {
+                                mutableStateOf(prefs.getBoolean(SettingsKeys.KEY_USE_24_HOUR, false))
+                            }
                             TminusApp(
                                 rootNavController = rootNav,
                                 initialV3 = settingsV3,
-                                onSaveSettings = { v3 ->
+                                initialUse24Hour = settingsUse24Hour,
+                                onSaveSettings = { v3, use24Hour ->
                                     prefs.edit()
                                         .putString(SettingsKeys.KEY_V3_API, v3.ifBlank { null })
+                                        .putBoolean(SettingsKeys.KEY_USE_24_HOUR, use24Hour)
                                         .commit()
                                     GlobalDataStore.invalidate()
                                     TminusApplication.refreshNetworking()
                                     settingsV3 = prefs.getString(SettingsKeys.KEY_V3_API, "") ?: ""
+                                    settingsUse24Hour =
+                                        prefs.getBoolean(SettingsKeys.KEY_USE_24_HOUR, false)
+                                    WidgetUpdateWorker.enqueueRefresh(this@MainActivity, appWidgetIds = null)
                                 },
                             )
                         }
@@ -147,7 +155,8 @@ private sealed class MainDestination(
 private fun TminusApp(
     rootNavController: NavHostController,
     initialV3: String,
-    onSaveSettings: (String) -> Unit,
+    initialUse24Hour: Boolean,
+    onSaveSettings: (String, Boolean) -> Unit,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -200,6 +209,7 @@ private fun TminusApp(
             composable(MainDestination.Settings.route) {
                 SettingsContent(
                     initialV3 = initialV3,
+                    initialUse24Hour = initialUse24Hour,
                     onSave = onSaveSettings,
                 )
             }
