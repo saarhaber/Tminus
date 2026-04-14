@@ -126,14 +126,16 @@ private fun WidgetConfigScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var globalResponse by remember { mutableStateOf<GlobalData?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var loadingTimeout by remember { mutableStateOf(false) }
     var reachableToStops by remember { mutableStateOf<List<Stop>?>(null) }
 
     LaunchedEffect(Unit) {
+        loadError = null
         val result = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }
         when (result) {
             is ApiResult.Ok -> globalResponse = result.data
-            is ApiResult.Error -> {}
+            is ApiResult.Error -> loadError = result.message
         }
     }
 
@@ -270,6 +272,25 @@ private fun WidgetConfigScreen(
                     }
 
                     when {
+                        globalResponse == null && loadError != null -> {
+                            item(key = "load_error") {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.widget_loading_timeout_tminus),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Text(
+                                        text = loadError!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
                         globalResponse == null && loadingTimeout -> {
                             item(key = "loading_timeout") {
                                 Column(
