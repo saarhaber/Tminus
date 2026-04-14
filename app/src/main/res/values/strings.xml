@@ -33,6 +33,10 @@
     <string name="commute_target_time">Target commute time (Eastern)</string>
     <string name="commute_hour">Hour (0–23)</string>
     <string name="commute_minute">Minute</string>
+    <string name="time_picker_summary_24h">Times shown in 24-hour (saved in Settings)</string>
+    <string name="time_picker_summary_12h">Times shown in 12-hour with AM/PM (saved in Settings)</string>
+    <string name="time_picker_confirm">OK</string>
+    <string name="time_picker_cancel">Cancel</string>
     <string name="commute_window_before">Window: minutes before target</string>
     <string name="commute_window_after">Window: minutes after target</string>
     <string name="commute_lead_minutes">Notify me this many minutes before the train leaves my origin</string>
@@ -73,6 +77,9 @@
     <string name="last_train_list_title">Last / first train</string>
     <string name="last_train_add">Add alert</string>
     <string name="last_train_list_empty">No alerts yet. Add one for the last train home or the first train of the morning—notifications use scheduled times from the MBTA API.</string>
+    <string name="last_train_list_reorder_hint">Long-press a card to reorder. Swipe left to delete.</string>
+    <string name="last_train_list_delete">Remove alert</string>
+    <string name="last_train_list_timing_summary">Window %1$s · notify %2$d min before</string>
     <string name="last_train_editor_title">Train time alert</string>
     <string name="last_train_help">Pick route, direction, and stop. For “last train,” we take the latest scheduled departure in the evening window. For “first train,” the earliest in the morning window. Direction labels come from the MBTA API (e.g. inbound/outbound and destination).</string>
     <string name="last_train_name">Name</string>
@@ -84,14 +91,16 @@
     <string name="last_train_mode_first">First train</string>
     <string name="last_train_stop_picked">Stop: %1$s</string>
     <string name="last_train_notify_before">Notify this many minutes before departure</string>
-    <string name="last_train_window_start_min">Last train: window start (minutes from midnight)</string>
-    <string name="last_train_window_end_min">Last train: window end (minutes from midnight)</string>
-    <string name="last_train_first_window_start">First train: window start (minutes from midnight)</string>
-    <string name="last_train_first_window_end">First train: window end (minutes from midnight)</string>
+    <string name="last_train_window_start_min">Last train: evening window starts</string>
+    <string name="last_train_window_end_min">Last train: evening window ends</string>
+    <string name="last_train_first_window_start">First train: morning window starts</string>
+    <string name="last_train_first_window_end">First train: morning window ends</string>
 
     <string name="access_list_title">Accessibility alerts</string>
     <string name="access_add">Add watch</string>
     <string name="access_list_empty">Watch a route and station: when MBTA posts elevator or escalator alerts whose text matches that station, you get notified.</string>
+    <string name="access_list_reorder_hint">Long-press a card to reorder. Swipe left to delete.</string>
+    <string name="access_list_delete">Remove watch</string>
     <string name="access_editor_title">Accessibility watch</string>
     <string name="access_name">Name</string>
     <string name="access_route">Route</string>
@@ -113,6 +122,13 @@
     <string name="settings_v3_key_hint_empty">No key saved. All features work without one; add a key if the API throttles you (429) or loads keep failing.</string>
     <string name="settings_save_keys">Save</string>
     <string name="settings_api_key_saved_snackbar">API key saved</string>
+    <string name="settings_time_format_title">Time display</string>
+    <string name="settings_time_format_body">Used for commute targets, last/first train windows, lists, and the home screen trip widget. Tap Save below to apply everywhere.</string>
+    <string name="settings_time_format_12h">12-hour (AM/PM)</string>
+    <string name="settings_time_format_24h">24-hour</string>
+    <string name="settings_time_format_saved_snackbar">Time format saved</string>
+    <string name="settings_save_all">Save settings</string>
+    <string name="settings_saved_snackbar">Settings saved</string>
     <string name="roadmap_feature_roadmap_screen">This roadmap screen</string>
     <string name="roadmap_feature_commutes">Multiple saved commutes with leave and arrival notifications (schedule-based)</string>
     <string name="roadmap_feature_last_first_train">Last / first train reminders (scheduled departures in a time window)</string>

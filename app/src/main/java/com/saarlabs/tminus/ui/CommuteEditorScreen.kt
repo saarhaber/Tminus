@@ -58,12 +58,10 @@ public fun CommuteEditorScreen(
     var days by remember {
         mutableStateOf((initial?.daysOfWeek ?: listOf(1, 2, 3, 4, 5)).toSet())
     }
-    var hourStr by remember {
-        mutableStateOf(((initial?.targetMinutesFromMidnight ?: 8 * 60 + 30) / 60).toString())
+    var commuteTargetMinutes by remember {
+        mutableStateOf(initial?.targetMinutesFromMidnight ?: 8 * 60 + 30)
     }
-    var minStr by remember {
-        mutableStateOf(((initial?.targetMinutesFromMidnight ?: 8 * 60 + 30) % 60).toString().padStart(2, '0'))
-    }
+    val use24Hour = rememberUse24HourTime()
     var winBefore by remember { mutableStateOf((initial?.windowMinutesBefore ?: 45).toString()) }
     var winAfter by remember { mutableStateOf((initial?.windowMinutesAfter ?: 45).toString()) }
     var leadMin by remember { mutableStateOf((initial?.notifyLeadMinutes ?: 12).toString()) }
@@ -155,24 +153,13 @@ public fun CommuteEditorScreen(
         }
 
         Text(stringResource(R.string.commute_target_time), style = MaterialTheme.typography.titleSmall)
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = hourStr,
-                onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) hourStr = it },
-                label = { Text(stringResource(R.string.commute_hour)) },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
-            OutlinedTextField(
-                value = minStr,
-                onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) minStr = it },
-                label = { Text(stringResource(R.string.commute_minute)) },
-                modifier = Modifier.weight(1f),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
-        }
+        MinutesFromMidnightPickerField(
+            minutesFromMidnight = commuteTargetMinutes,
+            onMinutesChange = { commuteTargetMinutes = it },
+            label = stringResource(R.string.commute_target_time),
+            use24Hour = use24Hour,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         OutlinedTextField(
             value = winBefore,
@@ -239,9 +226,7 @@ public fun CommuteEditorScreen(
                                 return@launch
                             }
                         }
-                    val hour = hourStr.toIntOrNull()?.coerceIn(0, 23) ?: 8
-                    val minute = minStr.toIntOrNull()?.coerceIn(0, 59) ?: 0
-                    val targetMinutes = hour * 60 + minute
+                    val targetMinutes = commuteTargetMinutes.coerceIn(0, 24 * 60 - 1)
                     val wb = winBefore.toIntOrNull()?.coerceIn(0, 180) ?: 45
                     val wa = winAfter.toIntOrNull()?.coerceIn(0, 180) ?: 45
                     val windowStart = max(0, targetMinutes - wb)
@@ -343,9 +328,7 @@ public fun CommuteEditorScreen(
             }
             val from = requireNotNull(f)
             val to = requireNotNull(t)
-            val hour = hourStr.toIntOrNull()?.coerceIn(0, 23) ?: 8
-            val minute = minStr.toIntOrNull()?.coerceIn(0, 59) ?: 0
-            val targetMinutes = hour * 60 + minute
+            val targetMinutes = commuteTargetMinutes.coerceIn(0, 24 * 60 - 1)
             val profile =
                 CommuteProfile(
                     id = initial?.id ?: java.util.UUID.randomUUID().toString(),
