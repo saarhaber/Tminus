@@ -1,14 +1,16 @@
 package com.saarlabs.tminus
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import com.saarlabs.tminus.ui.theme.TminusTheme
+import com.saarlabs.tminus.ui.theme.rememberUserDarkTheme
 import androidx.compose.ui.Modifier
 import com.saarlabs.tminus.android.widget.WidgetUpdateWorker
 import com.saarlabs.tminus.ui.SettingsContent
@@ -21,9 +23,10 @@ public class SettingsActivity : ComponentActivity() {
         enableEdgeToEdge()
         val prefs = getSharedPreferences(SettingsKeys.PREFS, MODE_PRIVATE)
         setContent {
-            MaterialTheme {
+            val darkTheme = rememberUserDarkTheme()
+            TminusTheme(darkTheme = darkTheme) {
                 Surface(
-                    modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+                    modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     SettingsContent(
@@ -35,8 +38,11 @@ public class SettingsActivity : ComponentActivity() {
                                 .putBoolean(SettingsKeys.KEY_USE_24_HOUR, use24Hour)
                                 .commit()
                             GlobalDataStore.invalidate()
-                            TminusApplication.refreshNetworking()
-                            WidgetUpdateWorker.enqueueRefresh(this@SettingsActivity, appWidgetIds = null)
+                            runCatching { TminusApplication.refreshNetworking() }
+                                .onFailure { Log.e("SettingsActivity", "refreshNetworking failed", it) }
+                            runCatching {
+                                WidgetUpdateWorker.enqueueRefresh(this@SettingsActivity, appWidgetIds = null)
+                            }.onFailure { Log.e("SettingsActivity", "enqueueRefresh failed", it) }
                             Toast.makeText(
                                 this@SettingsActivity,
                                 getString(R.string.settings_saved_snackbar),

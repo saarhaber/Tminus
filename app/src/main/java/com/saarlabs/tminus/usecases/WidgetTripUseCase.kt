@@ -25,11 +25,9 @@ public class WidgetTripUseCase(private val client: MbtaV3Client) {
         val fromStop = globalData.getStop(fromStopId) ?: return ApiResult.Ok(WidgetTripOutput(null))
         val toStop = globalData.getStop(toStopId) ?: return ApiResult.Ok(WidgetTripOutput(null))
 
-        val fromStopIds =
-            listOf(fromStopId) + fromStop.childStopIds.filter { globalData.stops.containsKey(it) }
-        val toStopIds =
-            listOf(toStopId) + toStop.childStopIds.filter { globalData.stops.containsKey(it) }
-        val requestStopIds = (fromStopIds + toStopIds).distinct()
+        val requestStopIds =
+            (globalData.stopIdsForScheduleFilter(fromStop) + globalData.stopIdsForScheduleFilter(toStop))
+                .distinct()
 
         val scheduleResult = client.fetchScheduleForStops(requestStopIds, now)
         val scheduleResponse =

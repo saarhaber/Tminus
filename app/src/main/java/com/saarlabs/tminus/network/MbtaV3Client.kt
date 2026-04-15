@@ -27,7 +27,11 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -39,6 +43,14 @@ import kotlinx.serialization.json.jsonPrimitive
  * Optional [apiKey] maps to the V3 portal ([https://api-v3.mbta.com/](https://api-v3.mbta.com/)).
  */
 public class MbtaV3Client(private val apiKey: String?) {
+
+    /**
+     * With a V3 API key (1000 req/min tier), paginated endpoints fetch several pages concurrently.
+     * Without a key, requests stay sequential to stay within the lower anonymous limit.
+     */
+    private companion object {
+        const val KEYED_PARALLEL_PAGES = 8
+    }
 
     private val json =
         Json {
@@ -61,6 +73,11 @@ public class MbtaV3Client(private val apiKey: String?) {
                 apiKey?.takeIf { it.isNotBlank() }?.let { header("x-api-key", it) }
             }
         }
+
+    /** Release the Ktor engine; call before replacing the client (e.g. after API key changes). */
+    public fun close() {
+        httpClient.close()
+    }
 
     public suspend fun fetchGlobalData(): ApiResult<GlobalData> =
         withContext(Dispatchers.IO) {
@@ -324,31 +341,53 @@ public class MbtaV3Client(private val apiKey: String?) {
 
     /**
      * Schedules at [fromStopIds] with departure times between [minTime] and [maxTime] (HH:mm, Eastern).
+     * When [serviceDate] is null, the API defaults to the current schedule day (typically today).
+     * Pass an explicit [serviceDate] to load that calendar day’s trips in the window (needed when the
+     * window already passed earlier the same day).
+     * Paginates until all rows are loaded — a single page (500) is often incomplete for commuter rail.
      */
     public suspend fun fetchScheduleForStopsInWindow(
         stopIds: List<String>,
         minTime: String,
         maxTime: String,
+        serviceDate: LocalDate? = null,
     ): ApiResult<ScheduleResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val doc =
-                    httpClient
-                        .get("schedules") {
-                            parameter("filter[stop]", stopIds.joinToString(","))
-                            parameter("filter[min_time]", minTime)
-                            parameter("filter[max_time]", maxTime)
-                            parameter("include", "trip,route")
-                            parameter("page[limit]", "500")
-                        }
-                        .body<JsonObject>()
-                parseScheduleDocument(doc)
+                val allSchedules = mutableListOf<com.saarlabs.tminus.model.Schedule>()
+                val allTrips = mutableMapOf<String, Trip>()
+                var offset = 0
+                var guard = 0
+                val pageLimit = 500
+                while (guard++ < 500) {
+                    val doc =
+                        httpClient
+                            .get("schedules") {
+                                parameter("filter[stop]", stopIds.joinToString(","))
+                                parameter("filter[min_time]", minTime)
+                                parameter("filter[max_time]", maxTime)
+                                if (serviceDate != null) {
+                                    parameter("filter[date]", serviceDate.toString())
+                                }
+                                parameter("include", "trip,route")
+                                parameter("page[limit]", pageLimit.toString())
+                                parameter("page[offset]", offset.toString())
+                            }
+                            .body<JsonObject>()
+                    val page = parseSchedulePage(doc)
+                    allSchedules.addAll(page.schedules)
+                    page.trips.forEach { (id, trip) -> allTrips.putIfAbsent(id, trip) }
+                    val count = doc.dataArrayElements().size
+                    if (count < pageLimit) break
+                    offset += pageLimit
+                }
+                ApiResult.Ok(ScheduleResponse(schedules = allSchedules, trips = allTrips))
             } catch (e: Throwable) {
                 ApiResult.Error(message = describeMbtaRequestFailure(e))
             }
         }
 
-    private fun parseScheduleDocument(doc: JsonObject): ApiResult<ScheduleResponse> {
+    private fun parseSchedulePage(doc: JsonObject): ScheduleResponse {
         val schedules = mutableListOf<com.saarlabs.tminus.model.Schedule>()
         val trips = mutableMapOf<String, Trip>()
 
@@ -389,7 +428,7 @@ public class MbtaV3Client(private val apiKey: String?) {
             }
         }
 
-        return ApiResult.Ok(ScheduleResponse(schedules = schedules, trips = trips))
+        return ScheduleResponse(schedules = schedules, trips = trips)
     }
 
     /**
@@ -512,26 +551,88 @@ public class MbtaV3Client(private val apiKey: String?) {
      * Paginates with `page[offset]` and `page[limit]` on each request. We do not follow `links.next`
      * because those URLs contain unescaped `[` / `]` in query names, which breaks URL parsing on
      * Android/Ktor and caused incomplete stop/route loads (empty search after a failed fetch).
+     *
+     * When [apiKey] is set, loads the first page alone then fetches up to [KEYED_PARALLEL_PAGES]
+     * pages per wave in parallel so large catalog pulls finish faster within the higher rate tier.
      */
-    private suspend inline fun paginateJsonApi(
+    private suspend fun paginateJsonApi(
         path: String,
         pageLimit: Int,
-        crossinline configure: HttpRequestBuilder.() -> Unit = {},
-        crossinline eachPage: suspend (JsonObject) -> Unit,
+        configure: HttpRequestBuilder.() -> Unit = {},
+        eachPage: suspend (JsonObject) -> Unit,
+    ) {
+        if (apiKey.isNullOrBlank()) {
+            paginateJsonApiSequential(path, pageLimit, configure, eachPage)
+        } else {
+            paginateJsonApiParallel(path, pageLimit, configure, eachPage)
+        }
+    }
+
+    private suspend fun fetchJsonApiPage(
+        path: String,
+        pageLimit: Int,
+        offset: Int,
+        configure: HttpRequestBuilder.() -> Unit,
+    ): JsonObject =
+        httpClient.get(path) {
+            configure()
+            parameter("page[limit]", pageLimit.toString())
+            parameter("page[offset]", offset.toString())
+        }.body<JsonObject>()
+
+    private suspend fun paginateJsonApiSequential(
+        path: String,
+        pageLimit: Int,
+        configure: HttpRequestBuilder.() -> Unit,
+        eachPage: suspend (JsonObject) -> Unit,
     ) {
         var offset = 0
         var guard = 0
         while (guard++ < 500) {
-            val doc =
-                httpClient.get(path) {
-                    configure()
-                    parameter("page[limit]", pageLimit.toString())
-                    parameter("page[offset]", offset.toString())
-                }.body<JsonObject>()
+            val doc = fetchJsonApiPage(path, pageLimit, offset, configure)
             eachPage(doc)
             val count = doc.get("data")?.asJsonArrayOrNull()?.size ?: 0
             if (count < pageLimit) break
             offset += pageLimit
+        }
+    }
+
+    private suspend fun paginateJsonApiParallel(
+        path: String,
+        pageLimit: Int,
+        configure: HttpRequestBuilder.() -> Unit,
+        eachPage: suspend (JsonObject) -> Unit,
+    ) {
+        val first = fetchJsonApiPage(path, pageLimit, 0, configure)
+        eachPage(first)
+        val firstCount = first.get("data")?.asJsonArrayOrNull()?.size ?: 0
+        if (firstCount < pageLimit) return
+
+        var offset = pageLimit
+        var guard = 0
+        while (guard++ < 500) {
+            val offsets = (0 until KEYED_PARALLEL_PAGES).map { offset + it * pageLimit }
+            val docs =
+                coroutineScope {
+                    offsets
+                        .map { off ->
+                            async(Dispatchers.IO) {
+                                off to fetchJsonApiPage(path, pageLimit, off, configure)
+                            }
+                        }.awaitAll()
+                }.sortedBy { it.first }
+
+            var sawPartial = false
+            for ((_, doc) in docs) {
+                eachPage(doc)
+                val count = doc.get("data")?.asJsonArrayOrNull()?.size ?: 0
+                if (count < pageLimit) {
+                    sawPartial = true
+                    break
+                }
+            }
+            if (sawPartial) break
+            offset += KEYED_PARALLEL_PAGES * pageLimit
         }
     }
 

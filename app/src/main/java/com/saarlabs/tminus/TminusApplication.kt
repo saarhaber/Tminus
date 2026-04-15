@@ -8,6 +8,8 @@ import com.saarlabs.tminus.usecases.WidgetStationBoardUseCase
 import com.saarlabs.tminus.usecases.WidgetTripUseCase
 import com.saarlabs.tminus.commute.CommuteRepository
 import com.saarlabs.tminus.features.LastTrainRepository
+import kotlin.jvm.Volatile
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -34,6 +36,9 @@ public class TminusApplication : Application() {
         fun refreshNetworking() {
             val prefs = instance.getSharedPreferences(SettingsKeys.PREFS, MODE_PRIVATE)
             val v3 = prefs.getString(SettingsKeys.KEY_V3_API, null)
+            if (GlobalDataStore.isClientReady()) {
+                runCatching { GlobalDataStore.client.close() }
+            }
             val client = MbtaV3Client(v3)
             widgetTripUseCase = WidgetTripUseCase(client)
             widgetStationBoardUseCase = WidgetStationBoardUseCase(client)
@@ -46,10 +51,27 @@ internal object GlobalDataStore {
     lateinit var client: MbtaV3Client
 
     private val mutex = Mutex()
+    @Volatile
     private var cached: GlobalData? = null
+
+    /** False until [TminusApplication] finishes [TminusApplication.refreshNetworking]. */
+    internal fun isClientReady(): Boolean = ::client.isInitialized
+
+    /**
+     * Glance can run very early; wait briefly so [refreshNetworking] has assigned [client].
+     */
+    suspend fun awaitClientReady(timeoutMs: Long = 3000L) {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000L
+        while (!isClientReady() && System.nanoTime() < deadline) {
+            delay(50)
+        }
+    }
 
     suspend fun getOrLoad(forceRefresh: Boolean = false): ApiResult<GlobalData> =
         mutex.withLock {
+            if (!isClientReady()) {
+                return ApiResult.Error(message = "Network client not initialized")
+            }
             if (forceRefresh) {
                 cached = null
             }

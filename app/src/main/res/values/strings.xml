@@ -2,9 +2,11 @@
 <resources>
     <string name="app_name">tMinus</string>
     <string name="loading">Loading…</string>
+    <string name="action_undo">Undo</string>
+    <string name="list_item_removed">Removed</string>
+    <string name="empty_state_fab_hint">Tap the + button to add one.</string>
 
     <string name="nav_home">Home</string>
-    <string name="nav_roadmap">Roadmap</string>
     <string name="nav_settings">Settings</string>
 
     <string name="home_title">tMinus</string>
@@ -12,7 +14,7 @@
     <string name="home_commutes_button">Commutes &amp; notifications</string>
     <string name="home_last_train_button">Last / first train alerts</string>
     <string name="home_access_button">Elevator &amp; station alerts</string>
-    <string name="home_hint_tabs">Use the bar below for roadmap ideas and settings—more features will land here over time.</string>
+    <string name="home_hint_tabs">Use Home and Settings below—more features will land here over time.</string>
 
     <string name="commute_list_title">Commutes</string>
     <string name="commute_back">Back</string>
@@ -30,7 +32,7 @@
     <string name="day_fri">Fri</string>
     <string name="day_sat">Sat</string>
     <string name="day_sun">Sun</string>
-    <string name="commute_target_time">Target commute time (Eastern)</string>
+    <string name="commute_target_time">Target commute time</string>
     <string name="commute_hour">Hour (0–23)</string>
     <string name="commute_minute">Minute</string>
     <string name="time_picker_summary_24h">Times shown in 24-hour (saved in Settings)</string>
@@ -41,13 +43,15 @@
     <string name="commute_window_after">Window: minutes after target</string>
     <string name="commute_lead_minutes">Notify me this many minutes before the train leaves my origin</string>
     <string name="commute_notify_arrival">Also notify around scheduled arrival</string>
+    <string name="commute_notify_arrival_help">Sends a second ping when your trip is scheduled to reach your destination (uses timetable times, not live predictions).</string>
     <string name="commute_enabled">Commute enabled</string>
-    <string name="commute_preview_button">Preview trip in window (today)</string>
+    <string name="commute_enabled_help">When off, tMinus won’t look for trips or send leave or arrival notifications for this commute on your selected days.</string>
+    <string name="commute_preview_button">Preview next trip in window</string>
     <string name="commute_preview_title">Sample trip</string>
     <string name="commute_preview_dep">Departure:</string>
     <string name="commute_preview_arr">Arrival:</string>
     <string name="commute_preview_leave">Approx. leave by:</string>
-    <string name="commute_preview_none">No scheduled trip found in this window for today (schedules vary by day; try a different time window).</string>
+    <string name="commute_preview_none">No scheduled trip found in this window on your selected days in the next two weeks (schedules vary; try a wider time window).</string>
     <string name="commute_preview_need_stops">Choose from and to stops first.</string>
     <string name="commute_validation_need_name">Add a name for this commute.</string>
     <string name="commute_validation_need_from_stop">Choose a starting stop.</string>
@@ -75,6 +79,7 @@
     <string name="stop_search_hint">Search stops…</string>
     <string name="stop_favorite">Add to favorites</string>
     <string name="stop_unfavorite">Remove from favorites</string>
+    <string name="stop_pair_picker_title">Choose stops</string>
 
     <string name="last_train_list_title">Last / first train</string>
     <string name="last_train_add">Add alert</string>
@@ -109,46 +114,41 @@
     <string name="access_stop_picked">Station: %1$s</string>
     <string name="access_help">We fetch active alerts for the route and notify when the alert mentions your station (by name). Not every outage is tagged to a stop id—check mbta.com for full detail.</string>
 
-    <string name="roadmap_intro">Current capabilities and ideas for the future. Nothing here is a promise; it is a living list as the project grows.</string>
-    <string name="roadmap_section_in_app">In the app today</string>
-    <string name="roadmap_feature_trip_widget">Home screen trip widget (next trip between two stops)</string>
-    <string name="roadmap_feature_api_keys">Optional MBTA V3 API key field</string>
+    <string name="settings_appearance_title">Appearance</string>
+    <string name="settings_appearance_body">Light, dark, or system. Applies immediately.</string>
+    <string name="settings_theme_system_cd">Match device theme</string>
+    <string name="settings_theme_light_cd">Light theme</string>
+    <string name="settings_theme_dark_cd">Dark theme</string>
 
     <string name="settings_api_keys_title">API key</string>
-    <string name="settings_api_keys_body">tMinus uses the MBTA V3 API for schedules, stops, and alerts. The home screen widget, commutes and notifications, last/first train alerts, and accessibility watches all work without a key. Add a free key from the portal below if you see rate-limit errors (HTTP 429) or repeated load failures—higher limits are the only reason to save one.</string>
-    <string name="settings_link_v3_portal">V3 API portal — request a free key</string>
-    <string name="settings_link_v3_swagger">V3 API reference (Swagger)</string>
-    <string name="settings_v3_key_label">MBTA V3 API key (optional — for rate limits)</string>
-    <string name="settings_v3_key_hint_saved">Saved on this device. You can replace or clear it anytime.</string>
-    <string name="settings_v3_key_hint_unsaved">You have unsaved changes — tap Save to apply.</string>
-    <string name="settings_v3_key_hint_empty">No key saved. All features work without one; add a key if the API throttles you (429) or loads keep failing.</string>
+    <string name="settings_api_keys_body">Optional. Everything works without a key; add one if you see HTTP 429 or load failures.</string>
+    <string name="settings_link_v3_portal">Get a free key (MBTA portal)</string>
+    <string name="settings_link_v3_swagger">API reference (Swagger)</string>
+    <string name="settings_v3_key_label">MBTA V3 API key (optional)</string>
+    <string name="settings_v3_key_hint_saved">Saved on this device.</string>
+    <string name="settings_v3_key_hint_unsaved">Unsaved — tap Save.</string>
+    <string name="settings_time_format_hint_unsaved">Unsaved — tap Save.</string>
+    <string name="settings_v3_key_hint_empty">No key. Add one if requests are throttled.</string>
     <string name="settings_save_keys">Save</string>
     <string name="settings_api_key_saved_snackbar">API key saved</string>
     <string name="settings_time_format_title">Time display</string>
-    <string name="settings_time_format_body">Used for commute targets, last/first train windows, lists, and the home screen trip widget. Tap Save below to apply everywhere.</string>
+    <string name="settings_time_format_body">Times in commutes, lists, and the widget. Tap Save to apply.</string>
     <string name="settings_time_format_12h">12-hour (AM/PM)</string>
     <string name="settings_time_format_24h">24-hour</string>
     <string name="settings_time_format_saved_snackbar">Time format saved</string>
-    <string name="settings_save_all">Save settings</string>
+    <string name="settings_save_all">Save</string>
     <string name="settings_saved_snackbar">Settings saved</string>
-    <string name="roadmap_feature_roadmap_screen">This roadmap screen</string>
-    <string name="roadmap_feature_commutes">Multiple saved commutes with leave and arrival notifications (schedule-based)</string>
-    <string name="roadmap_feature_last_first_train">Last / first train reminders (scheduled departures in a time window)</string>
-    <string name="roadmap_feature_accessibility">Route-level elevator &amp; escalator alerts matched to your station name</string>
-    <string name="roadmap_section_planned">Planned or under consideration</string>
-    <string name="roadmap_feature_notifications">Finer-grained or prediction-based reminders (beyond schedules)</string>
-    <string name="roadmap_feature_alerts">Service alerts and elevator outages near your trip</string>
-    <string name="roadmap_feature_predictions">Live predictions in the widget (not only schedules)</string>
-    <string name="roadmap_feature_favorites">Saved stops and commute presets</string>
-    <string name="roadmap_feature_more_widgets">More home screen widgets (arrivals board, line status)</string>
     <string name="roadmap_section_community">Community</string>
-    <string name="roadmap_feature_contributing">Contributions welcome—see CONTRIBUTING.md on GitHub</string>
-    <string name="roadmap_footer">Have an idea? Open an issue or PR on the tMinus repository.</string>
-    <string name="roadmap_report_issue">Report a bug or suggest a feature</string>
+    <string name="roadmap_feature_contributing">How to contribute (GitHub)</string>
+    <string name="roadmap_footer">Ideas and PRs welcome on GitHub.</string>
+    <string name="roadmap_report_issue">Report or suggest (GitHub)</string>
 
-    <string name="widget_trip_description">Next trip from one stop to another</string>
-    <string name="widget_preview_route_label">CR · Inbound</string>
-    <string name="widget_preview_trip_summary">Natick Center → Back Bay · in 12 min</string>
+    <string name="widget_trip_label">Next trip</string>
+    <string name="widget_trip_description">Next scheduled trip between two stops, with countdown and departure or arrival times.</string>
+    <string name="widget_preview_route_name_cr">CR</string>
+    <string name="widget_preview_train_headsign">Inbound</string>
+    <string name="widget_preview_from_to">Natick Center → Back Bay</string>
+    <string name="widget_preview_in_minutes_sample">in 12 min</string>
     <string name="widget_preview_times">7:42 AM → 8:18 AM</string>
     <string name="widget_configure_title">Configure Trip Widget</string>
     <string name="widget_from">From</string>
@@ -163,7 +163,8 @@
     <string name="widget_loading_timeout_tminus">Unable to load stops. Check your connection or add a V3 API key in tMinus settings, then try again.</string>
     <string name="widget_select_different_stops">Choose a different destination.</string>
     <string name="widget_destinations_unavailable">Could not load destinations for this stop (%1$s). Check your connection or add a V3 API key in Settings, then try again.</string>
-    <string name="widget_configure">Tap to configure</string>
+    <string name="widget_configure">Tap to set up</string>
+    <string name="widget_tap_to_refresh">Tap to refresh</string>
     <string name="widget_set_from_to">Set your from and to stops</string>
     <string name="widget_unable_to_load">Unable to load</string>
     <string name="widget_trip_times_error">Trip times unavailable. Open tMinus or check your connection.</string>
@@ -172,15 +173,22 @@
     <string name="widget_track_short">Track %1$s</string>
     <string name="widget_train">Train %1$s</string>
 
-    <string name="widget_station_board_description">Scheduled departures at a stop</string>
+    <string name="widget_station_board_label">Station board</string>
+    <string name="widget_station_board_description">Upcoming scheduled departures at one stop, with line colors and countdown.</string>
     <string name="widget_station_board_configure_title">Configure station board</string>
     <string name="widget_station_board_scheduled_subtitle">Scheduled departures</string>
     <string name="widget_station_board_configure_hint">Choose a stop and optional line</string>
     <string name="widget_station_board_no_departures">No upcoming departures</string>
     <string name="widget_station_board_times_error">Departures unavailable. Open tMinus or check your connection.</string>
     <string name="widget_preview_station_board_station">Park Street</string>
-    <string name="widget_preview_station_board_line1">Red · Alewife · 3 min</string>
-    <string name="widget_preview_station_board_line2">Green · Heath St · 6 min</string>
+    <string name="widget_preview_sb_row1_route">Red</string>
+    <string name="widget_preview_sb_row1_dest">Alewife</string>
+    <string name="widget_preview_sb_row1_clock">7:45 AM</string>
+    <string name="widget_preview_sb_row1_min">in 3 min</string>
+    <string name="widget_preview_sb_row2_route">Green</string>
+    <string name="widget_preview_sb_row2_dest">Heath St</string>
+    <string name="widget_preview_sb_row2_clock">7:48 AM</string>
+    <string name="widget_preview_sb_row2_min">in 6 min</string>
     <string name="widget_station_board_select_stop_placeholder">Search stops</string>
     <string name="widget_station_board_selecting_stop">Station</string>
     <string name="widget_station_board_route_section">Line filter</string>

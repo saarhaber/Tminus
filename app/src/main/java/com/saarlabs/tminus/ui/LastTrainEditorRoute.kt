@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import com.saarlabs.tminus.features.LastTrainProfile
 import com.saarlabs.tminus.features.LastTrainRepository
@@ -19,11 +20,11 @@ import kotlinx.coroutines.launch
 
 @Composable
 public fun LastTrainEditorRoute(navController: NavController, profileId: String) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val repo = remember { LastTrainRepository(context.applicationContext) }
     var initial by remember { mutableStateOf<LastTrainProfile?>(null) }
     var ready by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(profileId) {
         initial =

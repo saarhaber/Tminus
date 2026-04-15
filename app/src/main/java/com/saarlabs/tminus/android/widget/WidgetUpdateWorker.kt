@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequestBuilder
@@ -13,21 +14,100 @@ import androidx.work.workDataOf
 import kotlinx.coroutines.delay
 
 /**
- * Forces one widget instance to recompose after prefs change (e.g. configuration). Uses the same
+ * Updates a single Glance widget instance. Tries [GlanceAppWidgetManager.getGlanceIdBy] first; if Glance
+ * has not registered that appWidgetId yet (common right after configuration), falls back to scanning
+ * [GlanceAppWidgetManager.getGlanceIds] and matching [GlanceAppWidgetManager.getAppWidgetId].
+ */
+private suspend fun tryUpdateGlanceWidget(
+    context: Context,
+    glanceAppWidgetManager: GlanceAppWidgetManager,
+    appWidgetId: Int,
+    widget: GlanceAppWidget,
+): Boolean {
+    val appCtx = context.applicationContext
+    try {
+        val glanceId = glanceAppWidgetManager.getGlanceIdBy(appWidgetId)
+        widget.update(appCtx, glanceId)
+        return true
+    } catch (_: IllegalArgumentException) {
+        // Registry not ready — fall through.
+    }
+    return try {
+        val glanceIds = glanceAppWidgetManager.getGlanceIds(widget.javaClass)
+        for (glanceId in glanceIds) {
+            try {
+                if (glanceAppWidgetManager.getAppWidgetId(glanceId) == appWidgetId) {
+                    widget.update(appCtx, glanceId)
+                    return true
+                }
+            } catch (_: IllegalArgumentException) {
+                continue
+            }
+        }
+        false
+    } catch (_: IllegalArgumentException) {
+        false
+    }
+}
+
+/**
+ * Forces one trip widget instance to recompose after prefs change (e.g. configuration). Uses the same
  * retry as [WidgetUpdateWorker] for Glance IDs that are not registered yet.
  */
 internal suspend fun updateTripWidgetWithRetry(context: Context, appWidgetId: Int) {
+    updateGlanceWidgetWithRetry(
+        context = context,
+        appWidgetId = appWidgetId,
+        widget = MBTATripWidget(),
+    )
+}
+
+/**
+ * Same as [updateTripWidgetWithRetry] for the station board widget.
+ */
+internal suspend fun updateStationBoardWidgetWithRetry(context: Context, appWidgetId: Int) {
+    updateGlanceWidgetWithRetry(
+        context = context,
+        appWidgetId = appWidgetId,
+        widget = MBTAStationBoardWidget(),
+    )
+}
+
+private suspend fun updateGlanceWidgetWithRetry(
+    context: Context,
+    appWidgetId: Int,
+    widget: GlanceAppWidget,
+) {
     val glanceAppWidgetManager = GlanceAppWidgetManager(context.applicationContext)
-    val widget = MBTATripWidget()
     repeat(WidgetUpdateWorker.MAX_RETRIES) { attempt ->
-        try {
-            val glanceId = glanceAppWidgetManager.getGlanceIdBy(appWidgetId)
-            widget.update(context.applicationContext, glanceId)
+        if (tryUpdateGlanceWidget(context, glanceAppWidgetManager, appWidgetId, widget)) {
+            // #region agent log
+            AgentDebugLog.log(
+                "WidgetUpdateWorker.kt:updateGlanceWidgetWithRetry",
+                "glance update ok",
+                "H5",
+                mapOf(
+                    "appWidgetId" to appWidgetId,
+                    "widgetClass" to widget::class.java.simpleName,
+                    "attempt" to (attempt + 1),
+                ),
+            )
+            // #endregion
             return
-        } catch (e: IllegalArgumentException) {
-            if (attempt < WidgetUpdateWorker.MAX_RETRIES - 1) delay(WidgetUpdateWorker.RETRY_DELAY_MS)
         }
+        if (attempt < WidgetUpdateWorker.MAX_RETRIES - 1) delay(WidgetUpdateWorker.RETRY_DELAY_MS)
     }
+    // #region agent log
+    AgentDebugLog.log(
+        "WidgetUpdateWorker.kt:updateGlanceWidgetWithRetry",
+        "glance update failed after retries",
+        "H5",
+        mapOf(
+            "appWidgetId" to appWidgetId,
+            "widgetClass" to widget::class.java.simpleName,
+        ),
+    )
+    // #endregion
 }
 
 public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParameters) :
@@ -36,24 +116,63 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
     override suspend fun doWork(): Result {
         val requestedIds = inputData.getIntArray(KEY_APP_WIDGET_IDS)
         val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
-        val componentName = ComponentName(applicationContext, MBTATripWidgetReceiver::class.java)
-        val appWidgetIds =
-            requestedIds?.toList() ?: appWidgetManager.getAppWidgetIds(componentName).toList()
 
-        if (appWidgetIds.isEmpty()) return Result.success()
+        val tripComponent = ComponentName(applicationContext, MBTATripWidgetReceiver::class.java)
+        val stationComponent = ComponentName(applicationContext, MBTAStationBoardWidgetReceiver::class.java)
 
-        val updateIntent =
-            Intent(applicationContext, MBTATripWidgetReceiver::class.java).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds.toIntArray())
+        val tripReceiverName = MBTATripWidgetReceiver::class.java.name
+        val stationReceiverName = MBTAStationBoardWidgetReceiver::class.java.name
+
+        val tripOnlyIds = mutableListOf<Int>()
+        val stationOnlyIds = mutableListOf<Int>()
+        val ambiguousIds = mutableListOf<Int>()
+
+        if (requestedIds != null) {
+            for (id in requestedIds) {
+                when (appWidgetManager.getAppWidgetInfo(id)?.provider?.className) {
+                    tripReceiverName -> tripOnlyIds.add(id)
+                    stationReceiverName -> stationOnlyIds.add(id)
+                    else -> ambiguousIds.add(id)
+                }
             }
-        applicationContext.sendBroadcast(updateIntent)
+        } else {
+            tripOnlyIds.addAll(appWidgetManager.getAppWidgetIds(tripComponent).toList())
+            stationOnlyIds.addAll(appWidgetManager.getAppWidgetIds(stationComponent).toList())
+        }
+
+        if (tripOnlyIds.isEmpty() && stationOnlyIds.isEmpty() && ambiguousIds.isEmpty()) {
+            return Result.success()
+        }
+
+        if (tripOnlyIds.isNotEmpty()) {
+            val updateIntent =
+                Intent(applicationContext, MBTATripWidgetReceiver::class.java).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, tripOnlyIds.toIntArray())
+                }
+            applicationContext.sendBroadcast(updateIntent)
+        }
+
+        if (stationOnlyIds.isNotEmpty()) {
+            val updateIntent =
+                Intent(applicationContext, MBTAStationBoardWidgetReceiver::class.java).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, stationOnlyIds.toIntArray())
+                }
+            applicationContext.sendBroadcast(updateIntent)
+        }
 
         val glanceAppWidgetManager = GlanceAppWidgetManager(applicationContext)
-        val widget = MBTATripWidget()
 
-        for (appWidgetId in appWidgetIds) {
-            updateWithRetry(glanceAppWidgetManager, widget, appWidgetId)
+        for (appWidgetId in tripOnlyIds) {
+            updateWithRetry(glanceAppWidgetManager, MBTATripWidget(), appWidgetId)
+        }
+        for (appWidgetId in stationOnlyIds) {
+            updateWithRetry(glanceAppWidgetManager, MBTAStationBoardWidget(), appWidgetId)
+        }
+        for (appWidgetId in ambiguousIds) {
+            updateWithRetry(glanceAppWidgetManager, MBTATripWidget(), appWidgetId)
+            updateWithRetry(glanceAppWidgetManager, MBTAStationBoardWidget(), appWidgetId)
         }
 
         return Result.success()
@@ -61,29 +180,26 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
 
     private suspend fun updateWithRetry(
         glanceManager: GlanceAppWidgetManager,
-        widget: MBTATripWidget,
+        widget: GlanceAppWidget,
         appWidgetId: Int,
     ) {
         repeat(MAX_RETRIES) { attempt ->
-            try {
-                val glanceId = glanceManager.getGlanceIdBy(appWidgetId)
-                widget.update(applicationContext, glanceId)
+            if (tryUpdateGlanceWidget(applicationContext, glanceManager, appWidgetId, widget)) {
                 return
-            } catch (e: IllegalArgumentException) {
-                if (attempt < MAX_RETRIES - 1) delay(RETRY_DELAY_MS)
             }
+            if (attempt < MAX_RETRIES - 1) delay(RETRY_DELAY_MS)
         }
     }
 
     public companion object {
         public const val WORK_NAME: String = "WidgetUpdate"
         public const val KEY_APP_WIDGET_IDS: String = "appWidgetIds"
-        internal const val MAX_RETRIES = 5
-        internal const val RETRY_DELAY_MS = 300L
+        internal const val MAX_RETRIES = 12
+        internal const val RETRY_DELAY_MS = 400L
 
         /**
-         * Refreshes trip widgets. Pass specific IDs after configuration, or null to update every
-         * placed instance (e.g. when returning to the home screen).
+         * Refreshes all home screen widgets (trip and station board). Pass specific IDs after
+         * configuration, or null to update every placed instance (e.g. when returning to the home screen).
          */
         public fun enqueueRefresh(context: Context, appWidgetIds: IntArray? = null) {
             val builder = OneTimeWorkRequestBuilder<WidgetUpdateWorker>()

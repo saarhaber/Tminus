@@ -4,7 +4,7 @@
 
 Open-source Android widgets and tools for MBTA riders. Application ID: **`com.saarlabs.tminus`**. The first feature is a **home screen trip widget** (Jetpack Glance) based on the contribution in [mbta/mobile_app#1593](https://github.com/mbta/mobile_app/pull/1593), adapted to call the public **MBTA V3 API** directly.
 
-The in-app UI uses bottom navigation: **Home**, **Roadmap** (current and possible future features), and **Settings** (API keys and documentation links).
+The in-app UI uses bottom navigation: **Home** and **Settings** (API keys, time format, documentation links, and community / contribution links).
 
 **Commutes** (from Home): save **multiple** named routes (from/to stops), **days of week**, a **target time**, and a **window** (minutes before/after) used to query schedules. Set **notify X minutes before departure** for a “time to leave” notification, and optionally a second ping around **scheduled arrival**. Checks run on a background schedule (about every 15 minutes) using **schedule data** from the MBTA V3 API—not live predictions. Grant **notification permission** on Android 13+ when prompted.
 

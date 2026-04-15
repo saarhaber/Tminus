@@ -37,10 +37,19 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.saarlabs.tminus.android.widget.StationBoardWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Tminus">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name="com.saarlabs.tminus.android.widget.MBTATripWidgetReceiver"
             android:exported="true"
-            android:label="@string/widget_trip_description">
+            android:label="@string/widget_trip_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -50,6 +59,21 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/mbta_trip_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.saarlabs.tminus.android.widget.MBTAStationBoardWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_station_board_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.glance.appwidget.GlanceAppWidget"
+                android:value="com.saarlabs.tminus.android.widget.MBTAStationBoardWidget" />
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mbta_station_board_widget_info" />
         </receiver>
     </application>
 </manifest>

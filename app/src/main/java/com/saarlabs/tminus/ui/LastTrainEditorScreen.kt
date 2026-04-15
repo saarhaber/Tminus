@@ -2,6 +2,8 @@ package com.saarlabs.tminus.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
@@ -10,27 +12,36 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -87,13 +98,30 @@ public fun LastTrainEditorScreen(
         remember(globalData) { globalData?.let { routesForDropdown(it.routes) } ?: emptyList() }
     val selectedRoute: Route? = routeList.find { it.id == routeId }
 
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.last_train_editor_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.commute_back),
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
     Column(
         modifier =
-            Modifier.verticalScroll(rememberScrollState())
+            Modifier
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(R.string.last_train_editor_title), style = MaterialTheme.typography.titleLarge)
         Text(stringResource(R.string.last_train_help), style = MaterialTheme.typography.bodySmall)
         OutlinedTextField(
             value = name,
@@ -226,32 +254,31 @@ public fun LastTrainEditorScreen(
         }
 
         Text(stringResource(R.string.commute_days), style = MaterialTheme.typography.titleSmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
-                1 to R.string.day_mon,
-                2 to R.string.day_tue,
-                3 to R.string.day_wed,
-                4 to R.string.day_thu,
-                5 to R.string.day_fri,
-                6 to R.string.day_sat,
-                7 to R.string.day_sun,
-            ).forEach { (dow, labelRes) ->
-                androidx.compose.material3.FilterChip(
-                    selected = days.contains(dow),
-                    onClick = {
-                        days = if (days.contains(dow)) days - dow else days + dow
-                    },
-                    label = { Text(stringResource(labelRes)) },
-                )
-            }
-        }
+        WeekdayChipRow(
+            selectedDays = days,
+            onToggleDay = { d ->
+                days = if (days.contains(d)) days - d else days + d
+            },
+        )
 
-        androidx.compose.foundation.layout.Row(
+        Row(
             horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = enabled,
+                        onValueChange = { enabled = it },
+                        role = Role.Switch,
+                    )
+                    .padding(vertical = 4.dp),
         ) {
-            Text(stringResource(R.string.commute_enabled))
-            Switch(checked = enabled, onCheckedChange = { enabled = it })
+            Text(
+                stringResource(R.string.commute_enabled),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
+            Switch(checked = enabled, onCheckedChange = null)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -295,6 +322,7 @@ public fun LastTrainEditorScreen(
         TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.commute_cancel))
         }
+    }
     }
 
     if (showStopDialog) {

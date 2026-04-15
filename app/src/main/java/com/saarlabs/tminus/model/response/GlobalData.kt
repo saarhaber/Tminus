@@ -17,4 +17,21 @@ public data class GlobalData(
             .filter { it.parentStationId == null }
             .filter { it.locationType == LocationType.STATION || it.locationType == LocationType.STOP }
             .sortedBy { it.name }
+
+    /**
+     * Stop IDs to pass to `/schedules?filter[stop]=…`, including platforms under a station.
+     * MBTA often omits [Stop.childStopIds] on parent stations; schedules reference platform IDs.
+     */
+    public fun stopIdsForScheduleFilter(stop: Stop): List<String> {
+        val root = stop.resolveParent(stops)
+        val out = LinkedHashSet<String>()
+        out.add(root.id)
+        for (cid in root.childStopIds) {
+            if (stops.containsKey(cid)) out.add(cid)
+        }
+        for (s in stops.values) {
+            if (s.parentStationId == root.id) out.add(s.id)
+        }
+        return out.toList()
+    }
 }

@@ -1,12 +1,12 @@
 package com.saarlabs.tminus.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -14,21 +14,27 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +53,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun StopPairPicker(
     onStopsChosen: (from: Stop, to: Stop) -> Unit,
@@ -54,6 +61,8 @@ public fun StopPairPicker(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val favoriteStore = remember(context) { FavoriteStopsStore(context) }
     var favoriteIds by remember { mutableStateOf(favoriteStore.getIds()) }
     var globalResponse by remember { mutableStateOf<GlobalData?>(null) }
@@ -110,7 +119,7 @@ public fun StopPairPicker(
         remember(globalResponse, searchQuery, fromStop, reachableToStops, reachableLoadError, favoriteIds) {
             globalResponse?.let { global ->
                 val query = searchQuery.trim().lowercase()
-                val stops =
+                val baseStops =
                     if (fromStop == null) {
                         global.getParentStopsForSelection()
                     } else {
@@ -120,51 +129,78 @@ public fun StopPairPicker(
                             else -> reachableToStops!!
                         }
                     }
+                val fromParentId = fromStop?.resolveParent(global.stops)?.id
+                val stops =
+                    if (fromParentId == null) {
+                        baseStops
+                    } else {
+                        baseStops.filter {
+                            it.resolveParent(global.stops).id != fromParentId
+                        }
+                    }
                 val filtered =
                     if (query.isEmpty()) stops else stops.filter { it.name.lowercase().contains(query) }
                 sortStopsWithFavoritesFirst(filtered, favoriteIds, global.stops)
             } ?: emptyList()
         }
 
-    Column(modifier = modifier.padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.commute_cancel)) }
-            Button(
-                onClick = {
-                    saveValidationMessage = null
-                    val f = fromStop
-                    val t = toStop
-                    val g = globalResponse
-                    val issues = mutableListOf<String>()
-                    if (g == null) {
-                        issues.add(context.getString(R.string.commute_save_need_stops_loading))
-                    }
-                    if (f == null) {
-                        issues.add(context.getString(R.string.commute_validation_need_from_stop))
-                    }
-                    if (t == null) {
-                        issues.add(context.getString(R.string.commute_validation_need_to_stop))
-                    }
-                    if (issues.isNotEmpty()) {
-                        saveValidationMessage = issues.joinToString("\n")
-                        return@Button
-                    }
-                    val fr = g!!.getStop(f!!.id)?.resolveParent(g.stops)
-                    val tr = g.getStop(t!!.id)?.resolveParent(g.stops)
-                    if (fr == null || tr == null) {
-                        saveValidationMessage = context.getString(R.string.commute_save_stops_unresolved)
-                        return@Button
-                    }
-                    onStopsChosen(fr, tr)
-                },
-            ) {
-                Text(stringResource(R.string.commute_use_stops))
-            }
+    fun tryConfirmStops() {
+        saveValidationMessage = null
+        val f = fromStop
+        val t = toStop
+        val g = globalResponse
+        val issues = mutableListOf<String>()
+        if (g == null) {
+            issues.add(context.getString(R.string.commute_save_need_stops_loading))
         }
+        if (f == null) {
+            issues.add(context.getString(R.string.commute_validation_need_from_stop))
+        }
+        if (t == null) {
+            issues.add(context.getString(R.string.commute_validation_need_to_stop))
+        }
+        if (issues.isNotEmpty()) {
+            saveValidationMessage = issues.joinToString("\n")
+            return
+        }
+        val fr = g!!.getStop(f!!.id)?.resolveParent(g.stops)
+        val tr = g.getStop(t!!.id)?.resolveParent(g.stops)
+        if (fr == null || tr == null) {
+            saveValidationMessage = context.getString(R.string.commute_save_stops_unresolved)
+            return
+        }
+        onStopsChosen(fr, tr)
+    }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.stop_pair_picker_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.commute_back),
+                        )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { tryConfirmStops() }) {
+                        Text(stringResource(R.string.commute_use_stops))
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+    Column(
+        modifier =
+            Modifier
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp),
+    ) {
         saveValidationMessage?.let { msg ->
             Text(
                 text = msg,
@@ -315,15 +351,20 @@ public fun StopPairPicker(
                                                     fromStop = resolved
                                                     searchQuery = ""
                                                 } else {
-                                                    if (resolved.id == fromStop!!.id) {
-                                                        Toast.makeText(
-                                                                context,
+                                                    if (
+                                                        Stop.equalOrFamily(
+                                                            resolved.id,
+                                                            fromStop!!.id,
+                                                            global.stops,
+                                                        )
+                                                    ) {
+                                                        scope.launch {
+                                                            snackbarHostState.showSnackbar(
                                                                 context.getString(
                                                                     R.string.widget_select_different_stops,
                                                                 ),
-                                                                Toast.LENGTH_SHORT,
                                                             )
-                                                            .show()
+                                                        }
                                                     } else {
                                                         toStop = resolved
                                                         searchQuery = ""
@@ -338,6 +379,7 @@ public fun StopPairPicker(
                 }
             }
         }
+    }
     }
 }
 

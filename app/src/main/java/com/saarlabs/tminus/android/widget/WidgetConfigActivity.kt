@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,6 +35,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.saarlabs.tminus.ui.theme.TminusTheme
+import com.saarlabs.tminus.ui.theme.rememberUserDarkTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -76,15 +77,30 @@ public class WidgetConfigActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        var appWidgetId =
+        val extraFromIntent =
             intent?.getIntExtra(
                 AppWidgetManager.EXTRA_APPWIDGET_ID,
                 AppWidgetManager.INVALID_APPWIDGET_ID,
             ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
-
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+        var appWidgetId = extraFromIntent
+        val usedPendingFallback = appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID
+        if (usedPendingFallback) {
             appWidgetId = widgetPreferences.getAndClearPendingConfigWidgetId()
         }
+        // #region agent log
+        AgentDebugLog.log(
+            "WidgetConfigActivity.kt:onCreate",
+            "trip configure id resolution",
+            "H1",
+            mapOf(
+                "activity" to "trip",
+                "extraFromIntent" to extraFromIntent,
+                "usedPendingFallback" to usedPendingFallback,
+                "finalAppWidgetId" to appWidgetId,
+                "willFinishInvalid" to (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID),
+            ),
+        )
+        // #endregion
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()
@@ -92,7 +108,8 @@ public class WidgetConfigActivity : ComponentActivity() {
         }
 
         setContent {
-            MaterialTheme {
+            val darkTheme = rememberUserDarkTheme()
+            TminusTheme(darkTheme = darkTheme) {
                 WidgetConfigScreen(
                     appWidgetId = appWidgetId,
                     widgetPreferences = widgetPreferences,
@@ -179,7 +196,7 @@ private fun WidgetConfigScreen(
         remember(globalResponse, searchQuery, fromStop, reachableToStops, reachableLoadError, favoriteIds) {
             globalResponse?.let { global ->
                 val query = searchQuery.trim().lowercase()
-                val stops =
+                val baseStops =
                     if (fromStop == null) {
                         global.getParentStopsForSelection()
                     } else {
@@ -187,6 +204,15 @@ private fun WidgetConfigScreen(
                             reachableToStops == null -> emptyList()
                             reachableLoadError != null -> global.getParentStopsForSelection()
                             else -> reachableToStops!!
+                        }
+                    }
+                val fromParentId = fromStop?.resolveParent(global.stops)?.id
+                val stops =
+                    if (fromParentId == null) {
+                        baseStops
+                    } else {
+                        baseStops.filter {
+                            it.resolveParent(global.stops).id != fromParentId
                         }
                     }
                 val filtered =
@@ -200,7 +226,7 @@ private fun WidgetConfigScreen(
         }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+        modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.widget_configure_title)) },
@@ -415,7 +441,13 @@ private fun WidgetConfigScreen(
                                                         fromStop = resolved
                                                         searchQuery = ""
                                                     } else {
-                                                        if (resolved.id == fromStop!!.id) {
+                                                        if (
+                                                            Stop.equalOrFamily(
+                                                                resolved.id,
+                                                                fromStop!!.id,
+                                                                global.stops,
+                                                            )
+                                                        ) {
                                                             Toast.makeText(
                                                                     context,
                                                                     context.getString(

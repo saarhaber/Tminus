@@ -11,18 +11,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -61,6 +65,8 @@ public fun AccessibilityListScreen(navController: NavController) {
         watches = repo.load()
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val reorderState =
         rememberReorderableLazyListState(onMove = { from, to ->
             watches =
@@ -73,12 +79,17 @@ public fun AccessibilityListScreen(navController: NavController) {
         })
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.access_list_title)) },
                 navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text(stringResource(R.string.commute_back))
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.commute_back),
+                        )
                     }
                 },
             )
@@ -92,10 +103,10 @@ public fun AccessibilityListScreen(navController: NavController) {
         },
     ) { padding ->
         if (watches.isEmpty()) {
-            Text(
-                stringResource(R.string.access_list_empty),
-                modifier = Modifier.padding(padding).padding(24.dp),
-                style = MaterialTheme.typography.bodyLarge,
+            EmptyState(
+                message = stringResource(R.string.access_list_empty),
+                hint = stringResource(R.string.empty_state_fab_hint),
+                modifier = Modifier.padding(padding),
             )
         } else {
             Column(
@@ -118,7 +129,10 @@ public fun AccessibilityListScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(watches, key = { it.id }) { w ->
-                        ReorderableItem(reorderState, key = w.id) { isDragging ->
+                        ReorderableItem(
+                            state = reorderState,
+                            key = w.id,
+                        ) { isDragging ->
                             val elevation by animateDpAsState(
                                 if (isDragging) 8.dp else 0.dp,
                                 label = "access_card_elevation",
@@ -127,9 +141,29 @@ public fun AccessibilityListScreen(navController: NavController) {
                                 rememberSwipeToDismissBoxState(
                                     confirmValueChange = { value ->
                                         if (value == SwipeToDismissBoxValue.EndToStart) {
+                                            val idx = watches.indexOfFirst { it.id == w.id }
+                                            if (idx < 0) return@rememberSwipeToDismissBoxState false
+                                            val removed = w
+                                            watches = watches.filter { it.id != w.id }
                                             scope.launch {
-                                                watches = watches.filter { it.id != w.id }
                                                 repo.save(watches)
+                                                when (
+                                                    snackbarHostState.showSnackbar(
+                                                        message =
+                                                            context.getString(R.string.list_item_removed),
+                                                        actionLabel =
+                                                            context.getString(R.string.action_undo),
+                                                    )
+                                                ) {
+                                                    SnackbarResult.ActionPerformed -> {
+                                                        watches =
+                                                            watches.toMutableList().apply {
+                                                                add(idx.coerceIn(0, size), removed)
+                                                            }
+                                                        repo.save(watches)
+                                                    }
+                                                    else -> {}
+                                                }
                                             }
                                             true
                                         } else {

@@ -1,5 +1,6 @@
 package com.saarlabs.tminus.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import com.saarlabs.tminus.commute.CommuteProfile
 import com.saarlabs.tminus.commute.CommuteRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -24,11 +26,10 @@ public fun CommuteEditorRoute(
     profileId: String,
 ) {
     val context = LocalContext.current
-    val repo = remember { CommuteRepository(context) }
+    val scope = rememberCoroutineScope()
+    val repo = remember { CommuteRepository(context.applicationContext) }
     var initial by remember { mutableStateOf<CommuteProfile?>(null) }
     var ready by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
     LaunchedEffect(profileId) {
         initial =
             if (profileId == "new") {
@@ -50,17 +51,26 @@ public fun CommuteEditorRoute(
         initial = initial,
         onSave = { profile ->
             scope.launch {
-                val list = repo.loadProfiles().toMutableList()
-                val idx = list.indexOfFirst { it.id == profile.id }
-                if (idx >= 0) {
-                    list[idx] = profile
-                } else {
-                    list.add(profile)
+                try {
+                    val list = repo.loadProfiles().toMutableList()
+                    val idx = list.indexOfFirst { it.id == profile.id }
+                    if (idx >= 0) {
+                        list[idx] = profile
+                    } else {
+                        list.add(profile)
+                    }
+                    repo.saveProfiles(list)
+                    runCatching { navController.popBackStack() }
+                        .onFailure { Log.e(TAG, "popBackStack failed after save", it) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to save commute", e)
                 }
-                repo.saveProfiles(list)
-                navController.popBackStack()
             }
         },
         onCancel = { navController.popBackStack() },
     )
 }
+
+private const val TAG = "CommuteEditorRoute"

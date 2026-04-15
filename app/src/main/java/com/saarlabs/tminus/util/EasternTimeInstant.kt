@@ -1,7 +1,7 @@
 package com.saarlabs.tminus.util
 
+import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlinx.datetime.Clock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -90,7 +90,9 @@ private constructor(internal val instant: Instant, public val local: LocalDateTi
     public companion object {
         internal val timeZone: TimeZone by lazy { TimeZone.of("America/New_York") }
 
-        public fun now(clock: Clock = Clock.System): EasternTimeInstant =
-            EasternTimeInstant(clock.now())
+        public fun now(clock: Clock = Clock.System): EasternTimeInstant {
+            val kt = clock.now()
+            return EasternTimeInstant(Instant.fromEpochMilliseconds(kt.toEpochMilliseconds()))
+        }
     }
 }
