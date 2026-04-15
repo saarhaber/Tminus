@@ -19,6 +19,9 @@ import com.saarlabs.tminus.SettingsKeys
 /** Deep navy aligned with launcher canvas [ic_launcher_background] (#0B1426). */
 private val BrandNavy = Color(0xFF0B1426)
 
+/** Cool white aligned with surface; avoids Material light defaults (Neutral94 etc.) that read lavender. */
+private val LightSurface = Color(0xFFFAFCFF)
+
 private val LightColorScheme =
     lightColorScheme(
         primary = Color(0xFF1E3A5F),
@@ -31,9 +34,17 @@ private val LightColorScheme =
         onSecondaryContainer = BrandNavy,
         tertiary = Color(0xFF5C7A94),
         onTertiary = Color.White,
-        surface = Color(0xFFFAFCFF),
+        surface = LightSurface,
         surfaceVariant = Color(0xFFE1E6EE),
-        background = Color(0xFFFAFCFF),
+        background = LightSurface,
+        surfaceTint = Color.Transparent,
+        surfaceDim = Color(0xFFE8EDF3),
+        surfaceBright = Color(0xFFFFFFFF),
+        surfaceContainerLowest = Color(0xFFFFFFFF),
+        surfaceContainerLow = Color(0xFFF7F9FC),
+        surfaceContainer = Color(0xFFF2F5F9),
+        surfaceContainerHigh = Color(0xFFECF0F5),
+        surfaceContainerHighest = Color(0xFFE5EAF0),
     )
 
 /** Navy-aligned ramp; avoids Material defaults (e.g. Neutral12 #211F26) that read purple-grey. */
