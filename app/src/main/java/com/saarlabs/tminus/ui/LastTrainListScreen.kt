@@ -12,18 +12,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -65,6 +69,8 @@ public fun LastTrainListScreen(navController: NavController) {
         profiles = repo.load()
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val reorderState =
         rememberReorderableLazyListState(onMove = { from, to ->
             profiles =
@@ -77,12 +83,17 @@ public fun LastTrainListScreen(navController: NavController) {
         })
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.last_train_list_title)) },
                 navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text(stringResource(R.string.commute_back))
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.commute_back),
+                        )
                     }
                 },
             )
@@ -96,10 +107,10 @@ public fun LastTrainListScreen(navController: NavController) {
         },
     ) { padding ->
         if (profiles.isEmpty()) {
-            Text(
-                stringResource(R.string.last_train_list_empty),
-                modifier = Modifier.padding(padding).padding(24.dp),
-                style = MaterialTheme.typography.bodyLarge,
+            EmptyState(
+                message = stringResource(R.string.last_train_list_empty),
+                hint = stringResource(R.string.empty_state_fab_hint),
+                modifier = Modifier.padding(padding),
             )
         } else {
             Column(
@@ -122,7 +133,10 @@ public fun LastTrainListScreen(navController: NavController) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(profiles, key = { it.id }) { p ->
-                        ReorderableItem(reorderState, key = p.id) { isDragging ->
+                        ReorderableItem(
+                            state = reorderState,
+                            key = p.id,
+                        ) { isDragging ->
                             val elevation by animateDpAsState(
                                 if (isDragging) 8.dp else 0.dp,
                                 label = "last_train_card_elevation",
@@ -131,9 +145,29 @@ public fun LastTrainListScreen(navController: NavController) {
                                 rememberSwipeToDismissBoxState(
                                     confirmValueChange = { value ->
                                         if (value == SwipeToDismissBoxValue.EndToStart) {
+                                            val idx = profiles.indexOfFirst { it.id == p.id }
+                                            if (idx < 0) return@rememberSwipeToDismissBoxState false
+                                            val removed = p
+                                            profiles = profiles.filter { it.id != p.id }
                                             scope.launch {
-                                                profiles = profiles.filter { it.id != p.id }
                                                 repo.save(profiles)
+                                                when (
+                                                    snackbarHostState.showSnackbar(
+                                                        message =
+                                                            context.getString(R.string.list_item_removed),
+                                                        actionLabel =
+                                                            context.getString(R.string.action_undo),
+                                                    )
+                                                ) {
+                                                    SnackbarResult.ActionPerformed -> {
+                                                        profiles =
+                                                            profiles.toMutableList().apply {
+                                                                add(idx.coerceIn(0, size), removed)
+                                                            }
+                                                        repo.save(profiles)
+                                                    }
+                                                    else -> {}
+                                                }
                                             }
                                             true
                                         } else {

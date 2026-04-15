@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Allow HTTP to host ingest (10.0.2.2 / adb reverse) for Cursor debug session logs. -->
+    <application
+        android:usesCleartextTraffic="true"
+        tools:targetApi="28" />
+</manifest>

@@ -21,10 +21,10 @@ import kotlinx.coroutines.launch
 @Composable
 public fun AccessibilityEditorRoute(navController: NavController, id: String) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val repo = remember { AccessibilityRepository(context.applicationContext) }
     var initial by remember { mutableStateOf<AccessibilityWatch?>(null) }
     var ready by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(id) {
         initial = if (id == "new") null else repo.load().find { it.id == id }

@@ -23,6 +23,52 @@ import androidx.compose.ui.unit.dp
 import com.saarlabs.tminus.R
 
 /**
+ * Dialog-only composable so [rememberTimePickerState] is never called conditionally inside the
+ * parent (Compose requires a stable order of remember calls per composition path).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MinutesFromMidnightPickerDialog(
+    minutesFromMidnight: Int,
+    use24Hour: Boolean,
+    label: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit,
+) {
+    val total = minutesFromMidnight.coerceIn(0, 24 * 60 - 1)
+    val hour24 = total / 60
+    val minute = total % 60
+    val state =
+        rememberTimePickerState(
+            initialHour = hour24,
+            initialMinute = minute,
+            is24Hour = use24Hour,
+        )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(label) },
+        text = {
+            TimePicker(state = state)
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val m = (state.hour * 60 + state.minute).coerceIn(0, 24 * 60 - 1)
+                    onConfirm(m)
+                },
+            ) {
+                Text(stringResource(R.string.time_picker_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.time_picker_cancel))
+            }
+        },
+    )
+}
+
+/**
  * Opens a Material time picker for a value stored as minutes from midnight (0–1439).
  * [label] describes the field; the button shows the formatted time and which format is active.
  */
@@ -34,11 +80,10 @@ internal fun MinutesFromMidnightPickerField(
     label: String,
     use24Hour: Boolean,
     modifier: Modifier = Modifier,
+    showLabelOnButton: Boolean = true,
 ) {
     var show by remember { mutableStateOf(false) }
     val total = minutesFromMidnight.coerceIn(0, 24 * 60 - 1)
-    val hour24 = total / 60
-    val minute = total % 60
     val summaryFormat =
         stringResource(
             if (use24Hour) {
@@ -52,8 +97,10 @@ internal fun MinutesFromMidnightPickerField(
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Text(label, style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(4.dp))
+            if (showLabelOnButton) {
+                Text(label, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(4.dp))
+            }
             Text(
                 formatMinutesFromMidnight(total, use24Hour),
                 style = MaterialTheme.typography.titleMedium,
@@ -67,33 +114,14 @@ internal fun MinutesFromMidnightPickerField(
         }
     }
     if (show) {
-        val state =
-            rememberTimePickerState(
-                initialHour = hour24,
-                initialMinute = minute,
-                is24Hour = use24Hour,
-            )
-        AlertDialog(
-            onDismissRequest = { show = false },
-            title = { Text(label) },
-            text = {
-                TimePicker(state = state)
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val m = (state.hour * 60 + state.minute).coerceIn(0, 24 * 60 - 1)
-                        onMinutesChange(m)
-                        show = false
-                    },
-                ) {
-                    Text(stringResource(R.string.time_picker_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { show = false }) {
-                    Text(stringResource(R.string.time_picker_cancel))
-                }
+        MinutesFromMidnightPickerDialog(
+            minutesFromMidnight = minutesFromMidnight,
+            use24Hour = use24Hour,
+            label = label,
+            onDismiss = { show = false },
+            onConfirm = { m ->
+                onMinutesChange(m)
+                show = false
             },
         )
     }

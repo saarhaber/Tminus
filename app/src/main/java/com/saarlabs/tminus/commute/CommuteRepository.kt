@@ -1,6 +1,7 @@
 package com.saarlabs.tminus.commute
 
 import android.content.Context
+import android.util.Log
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -17,9 +18,10 @@ import kotlinx.serialization.json.Json
 private const val PREFS = "commute_profiles"
 private const val KEY_LIST = "profiles_json"
 
-internal class CommuteRepository(private val context: Context) {
+internal class CommuteRepository(context: Context) {
 
-    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val app = context.applicationContext
+    private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -32,6 +34,7 @@ internal class CommuteRepository(private val context: Context) {
             runCatching {
                 json.decodeFromString(ListSerializer(CommuteProfile.serializer()), raw)
             }.getOrElse { emptyList() }
+                .distinctBy { it.id }
         }
 
     suspend fun saveProfiles(profiles: List<CommuteProfile>) =
@@ -42,15 +45,19 @@ internal class CommuteRepository(private val context: Context) {
                     json.encodeToString(ListSerializer(CommuteProfile.serializer()), profiles),
                 )
                 .apply()
-            scheduleWorker()
-            NotificationScheduler.enqueueImmediateRun(context)
+            runCatching { scheduleWorker() }
+                .exceptionOrNull()
+                ?.let { Log.e(TAG, "scheduleWorker failed", it) }
+            runCatching { NotificationScheduler.enqueueImmediateRun(app) }
+                .exceptionOrNull()
+                ?.let { Log.e(TAG, "enqueueImmediateRun failed", it) }
         }
 
     private fun scheduleWorker() {
         val work =
             PeriodicWorkRequestBuilder<TminusNotificationWorker>(15, TimeUnit.MINUTES)
                 .build()
-        WorkManager.getInstance(context)
+        WorkManager.getInstance(app)
             .enqueueUniquePeriodicWork(
                 TminusNotificationWorker.UNIQUE_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
@@ -59,11 +66,14 @@ internal class CommuteRepository(private val context: Context) {
     }
 
     companion object {
+        private const val TAG = "CommuteRepository"
+
         fun ensureWorkerScheduled(context: Context) {
+            val app = context.applicationContext
             val work =
                 PeriodicWorkRequestBuilder<TminusNotificationWorker>(15, TimeUnit.MINUTES)
                     .build()
-            WorkManager.getInstance(context)
+            WorkManager.getInstance(app)
                 .enqueueUniquePeriodicWork(
                     TminusNotificationWorker.UNIQUE_NAME,
                     ExistingPeriodicWorkPolicy.KEEP,

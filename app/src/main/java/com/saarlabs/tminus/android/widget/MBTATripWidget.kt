@@ -14,8 +14,10 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.LocalSize
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
@@ -86,6 +88,14 @@ public class MBTATripWidget : GlanceAppWidget() {
             }
         }
         if (config == null) {
+            // #region agent log
+            AgentDebugLog.log(
+                "MBTATripWidget.kt:provideGlanceInternal",
+                "showing trip configure prompt (no saved config)",
+                "H4",
+                mapOf("appWidgetId" to appWidgetId),
+            )
+            // #endregion
             withContext(Dispatchers.IO) {
                 WidgetPreferences(context.applicationContext).setPendingConfigWidgetId(appWidgetId)
             }
@@ -96,6 +106,7 @@ public class MBTATripWidget : GlanceAppWidget() {
         }
 
         val cfg = checkNotNull(config)
+        GlobalDataStore.awaitClientReady()
         val use24Hour =
             withContext(Dispatchers.IO) {
                 context.applicationContext
@@ -231,29 +242,28 @@ private object WidgetContent {
                         .background(bgColor)
                         .padding(t.padding)
                         .clickable(
-                            onClick =
-                                androidx.glance.appwidget.action.actionStartActivity(
-                                    Intent(context, WidgetConfigActivity::class.java).apply {
-                                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                                    },
-                                    androidx.glance.action.actionParametersOf(),
-                                )
+                            androidx.glance.appwidget.action.actionStartActivity(
+                                Intent(context, WidgetConfigActivity::class.java).apply {
+                                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                                },
+                                actionParametersOf(),
+                            ),
                         ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = context.getString(R.string.widget_configure),
+                    text = context.getString(R.string.widget_set_from_to),
                     modifier = GlanceModifier.fillMaxWidth(),
-                    style = centeredStyle(primaryColor, t.body),
+                    style = centeredStyle(deemphasizedColor, t.caption),
                     maxLines = 4,
                 )
                 Spacer(modifier = GlanceModifier.height(t.gapMedium))
                 Text(
-                    text = context.getString(R.string.widget_set_from_to),
+                    text = context.getString(R.string.widget_configure),
                     modifier = GlanceModifier.fillMaxWidth(),
-                    style = centeredStyle(deemphasizedColor, t.caption),
-                    maxLines = 6,
+                    style = centeredStyle(primaryColor, t.body),
+                    maxLines = 2,
                 )
             }
         }
@@ -261,6 +271,8 @@ private object WidgetContent {
 
     @Composable
     fun ErrorState(context: Context) {
+        val primaryColor =
+            Color(ContextCompat.getColor(context, R.color.key).toLong() and 0xFFFFFFFFL)
         val deemphasizedColor =
             Color(ContextCompat.getColor(context, R.color.deemphasized).toLong() and 0xFFFFFFFFL)
         val bgColor = Color(ContextCompat.getColor(context, R.color.fill2).toLong() and 0xFFFFFFFFL)
@@ -270,8 +282,7 @@ private object WidgetContent {
                 modifier =
                     GlanceModifier.fillMaxWidth()
                         .background(bgColor)
-                        .padding(t.padding)
-                        .clickable(actionStartActivity<MainActivity>()),
+                        .padding(t.padding),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -280,6 +291,15 @@ private object WidgetContent {
                     modifier = GlanceModifier.fillMaxWidth(),
                     style = centeredStyle(deemphasizedColor, t.body),
                     maxLines = 6,
+                )
+                Spacer(modifier = GlanceModifier.height(t.gapMedium))
+                Text(
+                    text = context.getString(R.string.widget_tap_to_refresh),
+                    modifier =
+                        GlanceModifier.fillMaxWidth()
+                            .clickable(actionRunCallback<WidgetRefreshActionCallback>(actionParametersOf())),
+                    style = centeredStyle(primaryColor, t.body),
+                    maxLines = 1,
                 )
             }
         }
@@ -301,8 +321,7 @@ private object WidgetContent {
                 modifier =
                     GlanceModifier.fillMaxWidth()
                         .background(bgColor)
-                        .padding(t.padding)
-                        .clickable(actionStartActivity<MainActivity>()),
+                        .padding(t.padding),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -318,6 +337,15 @@ private object WidgetContent {
                     modifier = GlanceModifier.fillMaxWidth(),
                     style = centeredStyle(deemphasizedColor, t.caption),
                     maxLines = 6,
+                )
+                Spacer(modifier = GlanceModifier.height(t.gapMedium))
+                Text(
+                    text = context.getString(R.string.widget_tap_to_refresh),
+                    modifier =
+                        GlanceModifier.fillMaxWidth()
+                            .clickable(actionRunCallback<WidgetRefreshActionCallback>(actionParametersOf())),
+                    style = centeredStyle(primaryColor, t.body),
+                    maxLines = 1,
                 )
             }
         }

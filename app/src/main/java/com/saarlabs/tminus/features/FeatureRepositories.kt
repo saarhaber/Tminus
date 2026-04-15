@@ -30,6 +30,7 @@ internal class LastTrainRepository(private val context: Context) {
             runCatching {
                 featureJson.decodeFromString(ListSerializer(LastTrainProfile.serializer()), raw)
             }.getOrElse { emptyList() }
+                .distinctBy { it.id }
         }
 
     suspend fun save(list: List<LastTrainProfile>) =
@@ -75,6 +76,7 @@ internal class AccessibilityRepository(private val context: Context) {
             runCatching {
                 featureJson.decodeFromString(ListSerializer(AccessibilityWatch.serializer()), raw)
             }.getOrElse { emptyList() }
+                .distinctBy { it.id }
         }
 
     suspend fun save(list: List<AccessibilityWatch>) =

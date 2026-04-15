@@ -1,31 +1,43 @@
 package com.saarlabs.tminus.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.saarlabs.tminus.model.Route
@@ -69,12 +81,29 @@ public fun AccessibilityEditorScreen(
         remember(globalData) { globalData?.let { routesForDropdown(it.routes) } ?: emptyList() }
     val selectedRoute: Route? = routeList.find { it.id == routeId }
 
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.access_editor_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.commute_back),
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
     Column(
         modifier =
-            Modifier.verticalScroll(rememberScrollState())
+            Modifier
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
     ) {
-        Text(stringResource(R.string.access_editor_title), style = MaterialTheme.typography.titleLarge)
         Text(stringResource(R.string.access_help), style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
@@ -137,12 +166,24 @@ public fun AccessibilityEditorScreen(
                 ),
             )
         }
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = enabled,
+                        onValueChange = { enabled = it },
+                        role = Role.Switch,
+                    )
+                    .padding(vertical = 4.dp),
         ) {
-            Text(stringResource(R.string.commute_enabled))
-            Switch(checked = enabled, onCheckedChange = { enabled = it })
+            Text(
+                stringResource(R.string.commute_enabled),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
+            Switch(checked = enabled, onCheckedChange = null)
         }
         Spacer(Modifier.height(8.dp))
         Button(
@@ -171,6 +212,7 @@ public fun AccessibilityEditorScreen(
         TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.commute_cancel))
         }
+    }
     }
 
     if (showStopDialog) {

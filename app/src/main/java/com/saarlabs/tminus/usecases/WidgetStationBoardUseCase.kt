@@ -22,8 +22,7 @@ public class WidgetStationBoardUseCase(private val client: MbtaV3Client) {
         limit: Int,
     ): ApiResult<WidgetStationBoardOutput> {
         val stop = globalData.getStop(stopId) ?: return ApiResult.Ok(WidgetStationBoardOutput(emptyList()))
-        val stopIds =
-            listOf(stopId) + stop.childStopIds.filter { globalData.stops.containsKey(it) }
+        val stopIds = globalData.stopIdsForScheduleFilter(stop)
 
         val scheduleResult = client.fetchScheduleForStops(stopIds, now)
         val scheduleResponse =

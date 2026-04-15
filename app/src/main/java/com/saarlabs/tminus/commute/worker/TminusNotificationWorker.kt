@@ -43,6 +43,9 @@ public class TminusNotificationWorker(
 
     override suspend fun doWork(): Result =
         withContext(Dispatchers.IO) {
+            if (!GlobalDataStore.isClientReady()) {
+                return@withContext Result.success()
+            }
             val prefs = applicationContext.getSharedPreferences(PREFS_STATE, Context.MODE_PRIVATE)
 
             runCommuteNotifications(prefs)
@@ -75,12 +78,9 @@ public class TminusNotificationWorker(
 
             val fromStop = global.getStop(profile.fromStopId) ?: continue
             val toStop = global.getStop(profile.toStopId) ?: continue
-            val fromIds =
-                listOf(profile.fromStopId) +
-                    fromStop.childStopIds.filter { global.stops.containsKey(it) }
-            val toIds =
-                listOf(profile.toStopId) + toStop.childStopIds.filter { global.stops.containsKey(it) }
-            val stopIds = (fromIds + toIds).distinct()
+            val stopIds =
+                (global.stopIdsForScheduleFilter(fromStop) + global.stopIdsForScheduleFilter(toStop))
+                    .distinct()
 
             val targetMinutes = profile.targetMinutesFromMidnight
             val windowStart = max(0, targetMinutes - profile.windowMinutesBefore)

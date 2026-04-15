@@ -58,11 +58,25 @@ internal class WidgetPreferences(private val context: Context) {
             val value =
                 listOf(config.fromStopId, config.toStopId, config.fromLabel, config.toLabel)
                     .joinToString("\n")
-            prefs.edit().putString(configKey(appWidgetId), value).commit()
+            val ok = prefs.edit().putString(configKey(appWidgetId), value).commit()
+            // #region agent log
+            AgentDebugLog.log(
+                "WidgetPreferences.kt:setConfig",
+                "trip prefs commit",
+                "H3",
+                mapOf(
+                    "appWidgetId" to appWidgetId,
+                    "prefsKey" to configKey(appWidgetId),
+                    "commitOk" to ok,
+                ),
+            )
+            // #endregion
         }
 
     suspend fun removeConfig(appWidgetId: Int) =
-        withContext(Dispatchers.IO) { prefs.edit().remove(configKey(appWidgetId)).commit() }
+        withContext(Dispatchers.IO) {
+            prefs.edit().remove(configKey(appWidgetId)).commit()
+        }
 
     private fun stationBoardConfigKey(appWidgetId: Int) = "station_board_config_$appWidgetId"
 
@@ -85,9 +99,23 @@ internal class WidgetPreferences(private val context: Context) {
         withContext(Dispatchers.IO) {
             val value =
                 listOf(config.stopId, config.stopLabel, config.routeId ?: "").joinToString("\n")
-            prefs.edit().putString(stationBoardConfigKey(appWidgetId), value).commit()
+            val ok = prefs.edit().putString(stationBoardConfigKey(appWidgetId), value).commit()
+            // #region agent log
+            AgentDebugLog.log(
+                "WidgetPreferences.kt:setStationBoardConfig",
+                "station board prefs commit",
+                "H3",
+                mapOf(
+                    "appWidgetId" to appWidgetId,
+                    "prefsKey" to stationBoardConfigKey(appWidgetId),
+                    "commitOk" to ok,
+                ),
+            )
+            // #endregion
         }
 
     suspend fun removeStationBoardConfig(appWidgetId: Int) =
-        withContext(Dispatchers.IO) { prefs.edit().remove(stationBoardConfigKey(appWidgetId)).commit() }
+        withContext(Dispatchers.IO) {
+            prefs.edit().remove(stationBoardConfigKey(appWidgetId)).commit()
+        }
 }

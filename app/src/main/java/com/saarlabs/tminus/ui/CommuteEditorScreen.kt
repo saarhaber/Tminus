@@ -2,23 +2,30 @@ package com.saarlabs.tminus.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,12 +33,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.saarlabs.tminus.model.Stop
+import com.saarlabs.tminus.model.WidgetTripData
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.util.EasternTimeInstant
 import com.saarlabs.tminus.GlobalDataStore
@@ -41,12 +51,42 @@ import com.saarlabs.tminus.commute.CommuteTripPlanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.toInstant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration.Companion.minutes
 
-@OptIn(ExperimentalLayoutApi::class)
+/** 1 = Monday … 7 = Sunday (matches commute day chips). */
+private fun isoDayOfWeek(date: LocalDate): Int =
+    when (date.dayOfWeek) {
+        DayOfWeek.MONDAY -> 1
+        DayOfWeek.TUESDAY -> 2
+        DayOfWeek.WEDNESDAY -> 3
+        DayOfWeek.THURSDAY -> 4
+        DayOfWeek.FRIDAY -> 5
+        DayOfWeek.SATURDAY -> 6
+        DayOfWeek.SUNDAY -> 7
+    }
+
+@Composable
+private fun RowHorizontalButtons(onCancel: () -> Unit, onSave: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.commute_cancel))
+        }
+        Button(onClick = onSave, modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.commute_save))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun CommuteEditorScreen(
     initial: CommuteProfile?,
@@ -100,14 +140,30 @@ public fun CommuteEditorScreen(
         return
     }
 
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(stringResource(R.string.commute_editor_title), style = MaterialTheme.typography.titleLarge)
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.commute_editor_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onCancel) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.commute_back),
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier =
+                Modifier
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
@@ -126,31 +182,12 @@ public fun CommuteEditorScreen(
         }
 
         Text(stringResource(R.string.commute_days), style = MaterialTheme.typography.titleSmall)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val dayLabels =
-                listOf(
-                    1 to R.string.day_mon,
-                    2 to R.string.day_tue,
-                    3 to R.string.day_wed,
-                    4 to R.string.day_thu,
-                    5 to R.string.day_fri,
-                    6 to R.string.day_sat,
-                    7 to R.string.day_sun,
-                )
-            dayLabels.forEach { (dow, labelRes) ->
-                FilterChip(
-                    selected = days.contains(dow),
-                    onClick = {
-                        days =
-                            if (days.contains(dow)) days - dow else days + dow
-                    },
-                    label = { Text(stringResource(labelRes)) },
-                )
-            }
-        }
+        WeekdayChipRow(
+            selectedDays = days,
+            onToggleDay = { d ->
+                days = if (days.contains(d)) days - d else days + d
+            },
+        )
 
         Text(stringResource(R.string.commute_target_time), style = MaterialTheme.typography.titleSmall)
         MinutesFromMidnightPickerField(
@@ -159,6 +196,7 @@ public fun CommuteEditorScreen(
             label = stringResource(R.string.commute_target_time),
             use24Hour = use24Hour,
             modifier = Modifier.fillMaxWidth(),
+            showLabelOnButton = false,
         )
 
         OutlinedTextField(
@@ -183,19 +221,59 @@ public fun CommuteEditorScreen(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.commute_notify_arrival))
-            Switch(checked = notifyArrival, onCheckedChange = { notifyArrival = it })
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = notifyArrival,
+                            onValueChange = { notifyArrival = it },
+                            role = Role.Switch,
+                        )
+                        .padding(vertical = 2.dp),
+            ) {
+                Text(
+                    stringResource(R.string.commute_notify_arrival),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                Switch(checked = notifyArrival, onCheckedChange = null)
+            }
+            Text(
+                text = stringResource(R.string.commute_notify_arrival_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.commute_enabled))
-            Switch(checked = enabled, onCheckedChange = { enabled = it })
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = enabled,
+                            onValueChange = { enabled = it },
+                            role = Role.Switch,
+                        )
+                        .padding(vertical = 2.dp),
+            ) {
+                Text(
+                    stringResource(R.string.commute_enabled),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                Switch(checked = enabled, onCheckedChange = null)
+            }
+            Text(
+                text = stringResource(R.string.commute_enabled_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
 
         validationMessage?.let { msg ->
@@ -203,11 +281,11 @@ public fun CommuteEditorScreen(
                 text = msg,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         Button(
             onClick = {
                 scope.launch {
@@ -239,54 +317,46 @@ public fun CommuteEditorScreen(
                         "${minH.toString().padStart(2, '0')}:${minM.toString().padStart(2, '0')}"
                     val maxTime =
                         "${maxH.toString().padStart(2, '0')}:${maxM.toString().padStart(2, '0')}"
-                    val fromIds =
-                        listOf(f.id) + f.childStopIds.filter { global.stops.containsKey(it) }
-                    val toIds =
-                        listOf(t.id) + t.childStopIds.filter { global.stops.containsKey(it) }
-                    val stopIds = (fromIds + toIds).distinct()
-                    val schedResult =
-                        withContext(Dispatchers.IO) {
-                            GlobalDataStore.client.fetchScheduleForStopsInWindow(
-                                stopIds,
-                                minTime,
-                                maxTime,
-                            )
-                        }
-                    val schedule =
+                    val stopIds =
+                        (global.stopIdsForScheduleFilter(f) + global.stopIdsForScheduleFilter(t))
+                            .distinct()
+                    val now = EasternTimeInstant.now()
+                    val today = now.local.date
+                    val allowedDays = if (days.isEmpty()) (1..7).toSet() else days
+                    var trip: WidgetTripData? = null
+                    for (dayOffset in 0 until 14) {
+                        val d = today.plus(dayOffset, DateTimeUnit.DAY)
+                        if (isoDayOfWeek(d) !in allowedDays) continue
+                        val schedResult =
+                            withContext(Dispatchers.IO) {
+                                GlobalDataStore.client.fetchScheduleForStopsInWindow(
+                                    stopIds,
+                                    minTime,
+                                    maxTime,
+                                    serviceDate = d,
+                                )
+                            }
                         when (schedResult) {
-                            is ApiResult.Ok -> schedResult.data
                             is ApiResult.Error -> {
                                 previewText = schedResult.message
                                 return@launch
                             }
+                            is ApiResult.Ok -> {
+                                trip =
+                                    CommuteTripPlanner.findNextCommutePreviewTrip(
+                                        schedResult.data,
+                                        global,
+                                        f.id,
+                                        t.id,
+                                        now,
+                                        windowStart,
+                                        windowEnd,
+                                        days,
+                                    )
+                                if (trip != null) break
+                            }
                         }
-                    val now = EasternTimeInstant.now()
-                    val tz = EasternTimeInstant.timeZone
-                    val today = now.local.date
-                    val windowStartEt =
-                        EasternTimeInstant(
-                            kotlinx.datetime.LocalDateTime(
-                                today,
-                                kotlinx.datetime.LocalTime(minH, minM, 0, 0),
-                            ).toInstant(tz),
-                        )
-                    val windowEndEt =
-                        EasternTimeInstant(
-                            kotlinx.datetime.LocalDateTime(
-                                today,
-                                kotlinx.datetime.LocalTime(maxH, maxM, 0, 0),
-                            ).toInstant(tz),
-                        )
-                    val trip =
-                        CommuteTripPlanner.findNextTripInWindow(
-                            schedule,
-                            global,
-                            f.id,
-                            t.id,
-                            now,
-                            windowStartEt,
-                            windowEndEt,
-                        )
+                    }
                     val lead = leadMin.toIntOrNull()?.coerceIn(1, 120) ?: 12
                     previewText =
                         if (trip != null) {
@@ -347,6 +417,7 @@ public fun CommuteEditorScreen(
                 )
             onSave(profile)
         })
+        }
     }
 
     previewText?.let { msg ->
@@ -360,20 +431,5 @@ public fun CommuteEditorScreen(
             title = { Text(stringResource(R.string.commute_preview_title)) },
             text = { Text(msg) },
         )
-    }
-}
-
-@Composable
-private fun RowHorizontalButtons(onCancel: () -> Unit, onSave: () -> Unit) {
-    androidx.compose.foundation.layout.Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
-            Text(stringResource(R.string.commute_cancel))
-        }
-        Button(onClick = onSave, modifier = Modifier.weight(1f)) {
-            Text(stringResource(R.string.commute_save))
-        }
     }
 }
