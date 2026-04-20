@@ -140,6 +140,15 @@ public class TminusNotificationWorker(
                         contentArgb = argbFromHexOrNull(trip.route.textColor),
                     )
                 }
+            } else if (leaveAtMs > nowMs) {
+                // Schedule a precise wakeup at the exact leave time so the notification arrives
+                // at the user-chosen lead (e.g. 12 min before) instead of at the next 15-minute
+                // periodic tick which drifts.
+                PreciseNotificationScheduler.scheduleAt(
+                    applicationContext,
+                    tag = leaveKey,
+                    triggerAtMs = leaveAtMs,
+                )
             }
 
             if (profile.notifyOnArrival) {
@@ -161,6 +170,12 @@ public class TminusNotificationWorker(
                             contentArgb = argbFromHexOrNull(trip.route.textColor),
                         )
                     }
+                } else if (arrMs > nowMs) {
+                    PreciseNotificationScheduler.scheduleAt(
+                        applicationContext,
+                        tag = arrivalKey,
+                        triggerAtMs = arrMs,
+                    )
                 }
             }
         }
@@ -244,6 +259,12 @@ public class TminusNotificationWorker(
                         contentArgb = argbFromHexOrNull(route?.textColor.orEmpty()),
                     )
                 }
+            } else if (notifyAt > nowMs) {
+                PreciseNotificationScheduler.scheduleAt(
+                    applicationContext,
+                    tag = key,
+                    triggerAtMs = notifyAt,
+                )
             }
         }
     }
@@ -412,8 +433,14 @@ public class TminusNotificationWorker(
         private const val PREFS_STATE = "tminus_notif_state"
         /** Bumped so existing installs pick up [NotificationManager.IMPORTANCE_HIGH] without stale channel settings. */
         private const val CHANNEL_ID = "commute_v2"
-        /** Wide enough for 15-minute periodic checks plus clock skew (commute / last-train lead times). */
-        private const val WINDOW_MS = 60_000L * 45
-        private const val ARRIVAL_WINDOW_MS = 60_000L * 15
+        /**
+         * Fire the "leave" notification only if we're this close to the exact target time
+         * ([leaveAtMs] / [notifyAt]). The main firing mechanism is now a precise WorkManager
+         * wakeup scheduled by [PreciseNotificationScheduler], so this window is just a safety net
+         * for late ticks. Keeping it tight avoids firing a "leave in 12 min" notification 30+
+         * minutes off target.
+         */
+        private const val WINDOW_MS = 60_000L * 5
+        private const val ARRIVAL_WINDOW_MS = 60_000L * 5
     }
 }

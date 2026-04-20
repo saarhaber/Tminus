@@ -2,8 +2,10 @@ package com.saarlabs.tminus.model.response
 
 import com.saarlabs.tminus.model.LocationType
 import com.saarlabs.tminus.model.Stop
+import kotlinx.serialization.Serializable
 
 /** Stops and routes loaded from the MBTA V3 API for search and labels. */
+@Serializable
 public data class GlobalData(
     val stops: Map<String, Stop>,
     val routes: Map<String, com.saarlabs.tminus.model.Route>,
