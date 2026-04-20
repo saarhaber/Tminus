@@ -7,10 +7,13 @@ import android.content.Intent
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 
 /**
@@ -193,6 +196,7 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
 
     public companion object {
         public const val WORK_NAME: String = "WidgetUpdate"
+        public const val PERIODIC_WORK_NAME: String = "WidgetUpdatePeriodic"
         public const val KEY_APP_WIDGET_IDS: String = "appWidgetIds"
         internal const val MAX_RETRIES = 12
         internal const val RETRY_DELAY_MS = 400L
@@ -207,6 +211,22 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
                 builder.setInputData(workDataOf(KEY_APP_WIDGET_IDS to appWidgetIds))
             }
             WorkManager.getInstance(context.applicationContext).enqueue(builder.build())
+        }
+
+        /**
+         * Schedules a periodic refresh of every placed widget so the "min until departure" and
+         * displayed times stay fresh without the user having to open the app or tap refresh. 15 min
+         * is WorkManager's floor for periodic work.
+         */
+        public fun ensurePeriodicRefresh(context: Context) {
+            val request =
+                PeriodicWorkRequestBuilder<WidgetUpdateWorker>(15, TimeUnit.MINUTES).build()
+            WorkManager.getInstance(context.applicationContext)
+                .enqueueUniquePeriodicWork(
+                    PERIODIC_WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    request,
+                )
         }
     }
 }

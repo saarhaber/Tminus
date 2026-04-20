@@ -1,6 +1,9 @@
 package com.saarlabs.tminus.model
 
+import kotlinx.serialization.Serializable
+
 /** GTFS route types as returned by the MBTA V3 API on [Route.type]. */
+@Serializable
 public enum class RouteType {
     LIGHT_RAIL,
     HEAVY_RAIL,
