@@ -158,6 +158,9 @@
     <string name="widget_preview_route_name_cr">CR</string>
     <string name="widget_preview_train_headsign">Inbound</string>
     <string name="widget_preview_from_to">Natick Center → Back Bay</string>
+    <string name="widget_preview_from_station">Natick Center</string>
+    <string name="widget_preview_to_station_arrow">→ Back Bay</string>
+    <string name="widget_preview_minutes_big">12</string>
     <string name="widget_preview_in_minutes_sample">in 12 min</string>
     <string name="widget_preview_times">7:42 AM → 8:18 AM</string>
     <string name="widget_configure_title">Configure Trip Widget</string>
@@ -199,10 +202,12 @@
     <string name="widget_preview_sb_row1_dest">Alewife</string>
     <string name="widget_preview_sb_row1_clock">7:45 AM</string>
     <string name="widget_preview_sb_row1_min">in 3 min</string>
+    <string name="widget_preview_sb_row1_min_short">3 min</string>
     <string name="widget_preview_sb_row2_route">Green</string>
     <string name="widget_preview_sb_row2_dest">Heath St</string>
     <string name="widget_preview_sb_row2_clock">7:48 AM</string>
     <string name="widget_preview_sb_row2_min">in 6 min</string>
+    <string name="widget_preview_sb_row2_min_short">6 min</string>
     <string name="widget_station_board_select_stop_placeholder">Search stops</string>
     <string name="widget_station_board_selecting_stop">Station</string>
     <string name="widget_station_board_route_section">Line filter</string>

@@ -1,135 +1,194 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Matches MBTAStationBoardWidget Board + DepartureRow: title, subtitle, rows with route chip + headsign + time. -->
+<!-- Matches MBTAStationBoardWidget Board()+DepartureRow():
+     blue top header (station title + refresh chip + subtitle), then rounded rows
+     each with accent bar, route chip, headsign, and right column min/clock. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_preview_widget_surface"
-    android:orientation="vertical"
-    android:padding="12dp">
+    android:orientation="vertical">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/widget_preview_station_board_station"
-        android:textColor="@color/key"
-        android:textSize="15sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/widget_station_board_scheduled_subtitle"
-        android:textColor="@color/deemphasized"
-        android:textSize="11sp" />
-
+    <!-- Colored station header band -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:background="@drawable/widget_preview_header_band"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="10dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:singleLine="true"
+                android:text="@string/widget_preview_station_board_station"
+                android:textColor="@color/widget_on_header"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/widget_preview_refresh_chip"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="@string/widget_refresh_short"
+                android:textColor="@color/widget_on_header"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/widget_preview_route_chip_red"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="4dp"
-            android:text="@string/widget_preview_sb_row1_route"
-            android:textColor="@android:color/white"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/widget_preview_sb_row1_dest"
-                android:textColor="@color/key"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="end"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/widget_preview_sb_row1_clock"
-                android:textColor="@color/key"
-                android:textSize="13sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/widget_preview_sb_row1_min"
-                android:textColor="@color/deemphasized"
-                android:textSize="11sp" />
-        </LinearLayout>
+            android:layout_marginTop="4dp"
+            android:alpha="0.85"
+            android:text="@string/widget_station_board_scheduled_subtitle"
+            android:textColor="@color/widget_on_header"
+            android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- Departure rows -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="6dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/widget_preview_route_chip_green"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="4dp"
-            android:text="@string/widget_preview_sb_row2_route"
-            android:textColor="@android:color/white"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
+        <!-- Row 1: Red Line / Alewife -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:background="@drawable/widget_preview_row_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="8dp">
+
+            <View
+                android:layout_width="4dp"
+                android:layout_height="32dp"
+                android:background="@drawable/widget_preview_accent_bar" />
 
             <TextView
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/widget_preview_sb_row2_dest"
-                android:textColor="@color/key"
-                android:textSize="12sp" />
+                android:layout_marginStart="8dp"
+                android:background="@drawable/widget_preview_route_chip_red"
+                android:minWidth="48dp"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="5dp"
+                android:text="@string/widget_preview_sb_row1_route"
+                android:textColor="@android:color/white"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:singleLine="true"
+                android:text="@string/widget_preview_sb_row1_dest"
+                android:textColor="@color/widget_on_surface"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_preview_sb_row1_min_short"
+                    android:textColor="#DA291C"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_preview_sb_row1_clock"
+                    android:textColor="@color/widget_on_surface_variant"
+                    android:textSize="11sp" />
+            </LinearLayout>
         </LinearLayout>
 
+        <!-- Row 2: Green Line / Heath St -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="end"
-            android:orientation="vertical">
+            android:layout_marginTop="6dp"
+            android:background="@drawable/widget_preview_row_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="8dp">
+
+            <View
+                android:layout_width="4dp"
+                android:layout_height="32dp"
+                android:background="@drawable/widget_preview_accent_bar_green" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/widget_preview_sb_row2_clock"
-                android:textColor="@color/key"
-                android:textSize="13sp" />
+                android:layout_marginStart="8dp"
+                android:background="@drawable/widget_preview_route_chip_green"
+                android:minWidth="48dp"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="5dp"
+                android:text="@string/widget_preview_sb_row2_route"
+                android:textColor="@android:color/white"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
             <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:singleLine="true"
+                android:text="@string/widget_preview_sb_row2_dest"
+                android:textColor="@color/widget_on_surface"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/widget_preview_sb_row2_min"
-                android:textColor="@color/deemphasized"
-                android:textSize="11sp" />
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_preview_sb_row2_min_short"
+                    android:textColor="#00843D"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/widget_preview_sb_row2_clock"
+                    android:textColor="@color/widget_on_surface_variant"
+                    android:textSize="11sp" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
