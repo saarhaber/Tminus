@@ -64,6 +64,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.SettingsKeys
+import com.saarlabs.tminus.android.widget.WidgetUpdateWorker
 import kotlinx.coroutines.launch
 
 private const val GITHUB_NEW_ISSUE_URL = "https://github.com/saarhaber/Tminus/issues/new"
@@ -217,6 +218,13 @@ public fun SettingsContent(
                                 prefs.edit()
                                     .putInt(SettingsKeys.KEY_FONT_SCALE_PERCENT, clamped)
                                     .apply()
+                            }
+                        },
+                        // Widgets read font scale once during composition, so they keep the old size
+                        // until something forces a recompose; refresh once the user lets go.
+                        onValueChangeFinished = {
+                            runCatching {
+                                WidgetUpdateWorker.enqueueRefresh(context, appWidgetIds = null)
                             }
                         },
                         valueRange =

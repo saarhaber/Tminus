@@ -9,6 +9,7 @@ import com.saarlabs.tminus.usecases.WidgetStationBoardUseCase
 import com.saarlabs.tminus.usecases.WidgetTripUseCase
 import com.saarlabs.tminus.commute.CommuteRepository
 import com.saarlabs.tminus.features.LastTrainRepository
+import com.saarlabs.tminus.android.widget.LiveUpdateManager
 import com.saarlabs.tminus.android.widget.WidgetUpdateWorker
 import java.io.File
 import kotlin.jvm.Volatile
@@ -35,6 +36,10 @@ public class TminusApplication : Application() {
         CommuteRepository.ensureWorkerScheduled(this)
         LastTrainRepository.ensureWorker(this)
         WidgetUpdateWorker.ensurePeriodicRefresh(this)
+        // The 15 min WorkManager floor is too coarse for a per-minute countdown, so kick the 60 s
+        // exact-alarm chain whenever the user has any widgets placed.
+        runCatching { LiveUpdateManager.ensureRunningIfNeeded(this) }
+            .onFailure { Log.w("TminusApplication", "live update ensure failed", it) }
     }
 
     public companion object {

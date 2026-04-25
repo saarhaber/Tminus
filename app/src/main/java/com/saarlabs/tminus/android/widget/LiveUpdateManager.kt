@@ -2,6 +2,8 @@ package com.saarlabs.tminus.android.widget
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -71,6 +73,34 @@ public object LiveUpdateManager {
         if (!prefs.getBoolean(KEY_ACTIVE, false)) return false
         val deadline = prefs.getLong(KEY_DEADLINE_ELAPSED, 0L)
         return deadline == 0L || SystemClock.elapsedRealtime() < deadline
+    }
+
+    /** Returns true when at least one trip or station-board widget is currently placed by the user. */
+    public fun hasPlacedWidgets(context: Context): Boolean {
+        val appCtx = context.applicationContext
+        val mgr = AppWidgetManager.getInstance(appCtx)
+        val tripIds = runCatching {
+            mgr.getAppWidgetIds(ComponentName(appCtx, MBTATripWidgetReceiver::class.java))
+        }.getOrDefault(IntArray(0))
+        val stationIds = runCatching {
+            mgr.getAppWidgetIds(ComponentName(appCtx, MBTAStationBoardWidgetReceiver::class.java))
+        }.getOrDefault(IntArray(0))
+        return tripIds.isNotEmpty() || stationIds.isNotEmpty()
+    }
+
+    /**
+     * Idempotently starts live ticks if any widgets are placed and exact alarms are allowed.
+     * Uses an unlimited duration so the per-minute countdown stays current as long as widgets exist;
+     * each tick re-arms the next, so the chain self-recovers after reboots once a widget update fires.
+     */
+    public fun ensureRunningIfNeeded(context: Context) {
+        val appCtx = context.applicationContext
+        if (!hasPlacedWidgets(appCtx)) {
+            if (isRunning(appCtx)) stop(appCtx)
+            return
+        }
+        if (isRunning(appCtx)) return
+        start(appCtx, durationMs = 0L)
     }
 
     /**

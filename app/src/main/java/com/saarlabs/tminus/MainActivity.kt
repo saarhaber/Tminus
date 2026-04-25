@@ -266,16 +266,11 @@ private fun HomeTab(
             title = stringResource(R.string.home_commutes_button),
             subtitle = stringResource(R.string.home_feature_commutes_desc),
             icon = Icons.Filled.DirectionsTransit,
-            gradient =
-                Brush.linearGradient(
-                    listOf(
-                        scheme.primary,
-                        scheme.primaryContainer,
-                    ),
-                ),
+            background = scheme.primaryContainer,
+            iconBackdrop = scheme.primary,
             iconTint = scheme.onPrimary,
-            titleColor = scheme.onPrimary,
-            subtitleColor = scheme.onPrimary.copy(alpha = 0.85f),
+            titleColor = scheme.onPrimaryContainer,
+            subtitleColor = scheme.onPrimaryContainer.copy(alpha = 0.82f),
             onClick = onOpenCommutes,
         )
         Spacer(Modifier.height(12.dp))
@@ -283,16 +278,11 @@ private fun HomeTab(
             title = stringResource(R.string.home_last_train_button),
             subtitle = stringResource(R.string.home_feature_last_train_desc),
             icon = Icons.Filled.NightsStay,
-            gradient =
-                Brush.linearGradient(
-                    listOf(
-                        scheme.tertiary,
-                        scheme.tertiaryContainer,
-                    ),
-                ),
+            background = scheme.tertiaryContainer,
+            iconBackdrop = scheme.tertiary,
             iconTint = scheme.onTertiary,
-            titleColor = scheme.onTertiary,
-            subtitleColor = scheme.onTertiary.copy(alpha = 0.85f),
+            titleColor = scheme.onTertiaryContainer,
+            subtitleColor = scheme.onTertiaryContainer.copy(alpha = 0.82f),
             onClick = onOpenLastTrain,
         )
         Spacer(Modifier.height(12.dp))
@@ -300,16 +290,11 @@ private fun HomeTab(
             title = stringResource(R.string.home_access_button),
             subtitle = stringResource(R.string.home_feature_access_desc),
             icon = Icons.Filled.Accessible,
-            gradient =
-                Brush.linearGradient(
-                    listOf(
-                        scheme.secondary,
-                        scheme.secondaryContainer,
-                    ),
-                ),
+            background = scheme.secondaryContainer,
+            iconBackdrop = scheme.secondary,
             iconTint = scheme.onSecondary,
-            titleColor = scheme.onSecondary,
-            subtitleColor = scheme.onSecondary.copy(alpha = 0.85f),
+            titleColor = scheme.onSecondaryContainer,
+            subtitleColor = scheme.onSecondaryContainer.copy(alpha = 0.82f),
             onClick = onOpenAccessibility,
         )
 
@@ -385,7 +370,8 @@ private fun FeatureCard(
     title: String,
     subtitle: String,
     icon: ImageVector,
-    gradient: Brush,
+    background: Color,
+    iconBackdrop: Color,
     iconTint: Color,
     titleColor: Color,
     subtitleColor: Color,
@@ -397,14 +383,13 @@ private fun FeatureCard(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
                 .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        colors = CardDefaults.cardColors(containerColor = background),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(gradient)
                     .padding(PaddingValues(horizontal = 18.dp, vertical = 18.dp)),
         ) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -413,7 +398,7 @@ private fun FeatureCard(
                         Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White.copy(alpha = 0.20f)),
+                            .background(iconBackdrop),
                     contentAlignment = androidx.compose.ui.Alignment.Center,
                 ) {
                     Icon(
@@ -441,7 +426,7 @@ private fun FeatureCard(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = null,
-                    tint = iconTint,
+                    tint = titleColor,
                 )
             }
         }

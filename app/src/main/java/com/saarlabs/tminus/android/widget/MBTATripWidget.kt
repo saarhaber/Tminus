@@ -199,7 +199,10 @@ private object WidgetContent {
         val h = size.height.value.coerceAtLeast(1f)
         val shortEdge = minOf(w, h)
         val baseScale = (shortEdge / 112f).coerceIn(0.55f, 2.2f)
-        val scale = baseScale * fontScale
+        // Same damping as the station-board widget — keep the giant minutes glyph readable but stop
+        // it from forcing the headsign / time row to truncate when the user picks 1.4×–1.6×.
+        val widgetFontScale = (0.6f + 0.4f * fontScale)
+        val scale = baseScale * widgetFontScale
         val stackStations = w < 240f
         val compactMinutes = w < 210f || h < 110f
         val padding = (14f * baseScale).coerceIn(10f, 22f).dp

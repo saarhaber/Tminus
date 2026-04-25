@@ -18,5 +18,11 @@ public class MBTATripWidgetReceiver : GlanceAppWidgetReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             appWidgetIds.forEach { widgetPreferences.removeConfig(it) }
         }
+        LiveUpdateManager.ensureRunningIfNeeded(context.applicationContext)
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        LiveUpdateManager.ensureRunningIfNeeded(context.applicationContext)
     }
 }

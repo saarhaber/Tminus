@@ -18,5 +18,11 @@ public class MBTAStationBoardWidgetReceiver : GlanceAppWidgetReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             appWidgetIds.forEach { widgetPreferences.removeStationBoardConfig(it) }
         }
+        LiveUpdateManager.ensureRunningIfNeeded(context.applicationContext)
+    }
+
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        LiveUpdateManager.ensureRunningIfNeeded(context.applicationContext)
     }
 }
