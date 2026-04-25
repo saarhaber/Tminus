@@ -204,7 +204,11 @@ private object StationBoardContent {
         val h = size.height.value.coerceAtLeast(1f)
         val shortEdge = minOf(w, h)
         val baseScale = (shortEdge / 112f).coerceIn(0.55f, 2.2f)
-        val scale = baseScale * fontScale
+        // Widgets have far less horizontal room than the in-app screens, so blunt the user's
+        // fontScale a bit (1.6× in app → ~1.24× here) to keep the route chip + minutes column from
+        // clipping the time on long route names like "Framingham/Worcester".
+        val widgetFontScale = (0.6f + 0.4f * fontScale)
+        val scale = baseScale * widgetFontScale
         val stackTime = w < 260f
         val padding = (12f * baseScale).coerceIn(8f, 20f).dp
         val title = (16f * scale).coerceIn(12f, 28f).sp

@@ -33,6 +33,7 @@ public class WidgetTickReceiver : BroadcastReceiver() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 MBTATripWidget().updateAll(appCtx)
+                MBTAStationBoardWidget().updateAll(appCtx)
             } catch (t: Throwable) {
                 android.util.Log.e(TAG, "updateAll failed", t)
             } finally {
