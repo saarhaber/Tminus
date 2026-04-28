@@ -175,8 +175,8 @@ public fun CommuteEditorScreen(
             Text(
                 stringResource(
                     R.string.commute_stops_summary,
-                    fromStop?.name ?: "—",
-                    toStop?.name ?: "—",
+                    fromStop?.let { stopOneLineDisplay(it, context.resources) } ?: "—",
+                    toStop?.let { stopOneLineDisplay(it, context.resources) } ?: "—",
                 ),
             )
         }
@@ -405,8 +405,8 @@ public fun CommuteEditorScreen(
                     name = name.trim(),
                     fromStopId = from.id,
                     toStopId = to.id,
-                    fromLabel = from.name,
-                    toLabel = to.name,
+                    fromLabel = stopOneLineDisplay(from, context.resources),
+                    toLabel = stopOneLineDisplay(to, context.resources),
                     daysOfWeek = days.sorted(),
                     targetMinutesFromMidnight = targetMinutes,
                     windowMinutesBefore = winBefore.toIntOrNull()?.coerceIn(5, 180) ?: 45,

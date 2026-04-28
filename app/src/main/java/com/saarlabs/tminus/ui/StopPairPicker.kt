@@ -213,7 +213,7 @@ public fun StopPairPicker(
         if (fromStop != null) {
             StopChip(
                 label = stringResource(R.string.widget_from),
-                name = fromStop!!.name,
+                stop = fromStop!!,
                 onClear = {
                     fromStop = null
                     toStop = null
@@ -223,7 +223,7 @@ public fun StopPairPicker(
         if (toStop != null) {
             StopChip(
                 label = stringResource(R.string.widget_to),
-                name = toStop!!.name,
+                stop = toStop!!,
                 onClear = { toStop = null },
             )
         }
@@ -313,7 +313,7 @@ public fun StopPairPicker(
                                             RoundedCornerShape(8.dp),
                                         )
                                         .padding(vertical = 4.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                verticalAlignment = Alignment.Top,
                             ) {
                                 IconButton(
                                     onClick = {
@@ -332,9 +332,8 @@ public fun StopPairPicker(
                                             else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = resolved.name,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                StopSelectionTitleWithSubtitle(
+                                    stop = resolved,
                                     modifier =
                                         Modifier.weight(1f)
                                             .clickable {
@@ -375,7 +374,7 @@ public fun StopPairPicker(
 }
 
 @Composable
-private fun StopChip(label: String, name: String, onClear: () -> Unit) {
+private fun StopChip(label: String, stop: Stop, onClear: () -> Unit) {
     Row(
         modifier =
             Modifier.padding(vertical = 4.dp)
@@ -384,10 +383,20 @@ private fun StopChip(label: String, name: String, onClear: () -> Unit) {
                     RoundedCornerShape(8.dp),
                 )
                 .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
-        Text("$label: $name", style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.weight(1f))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("$label: ${stop.name}", style = MaterialTheme.typography.bodyLarge)
+            val sub = stopSelectionSubtitle(stop)
+            if (sub.isNotEmpty()) {
+                Text(
+                    text = sub,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         TextButton(onClick = onClear) { Text(stringResource(R.string.widget_clear_stop)) }
     }
 }

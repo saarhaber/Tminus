@@ -96,7 +96,7 @@ public fun StopSearchPicker(
                 val fav = resolved.id in favoriteIds
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Top,
                 ) {
                     IconButton(
                         onClick = {
@@ -113,13 +113,12 @@ public fun StopSearchPicker(
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(
-                        text = resolved.name,
+                    StopSelectionTitleWithSubtitle(
+                        stop = resolved,
                         modifier =
                             Modifier.weight(1f)
                                 .clickable { onStopChosen(resolved) }
                                 .padding(top = 16.dp, bottom = 16.dp, end = 16.dp),
-                        style = MaterialTheme.typography.bodyLarge,
                     )
                 }
             }

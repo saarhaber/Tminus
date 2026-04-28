@@ -85,6 +85,14 @@
     <string name="stop_favorite">Add to favorites</string>
     <string name="stop_unfavorite">Remove from favorites</string>
     <string name="stop_pair_picker_title">Choose stops</string>
+    <string name="stop_subtitle_subway">Subway</string>
+    <string name="stop_subtitle_light_rail">Light rail</string>
+    <string name="stop_subtitle_commuter_rail">Commuter rail</string>
+    <string name="stop_subtitle_bus">Bus</string>
+    <string name="stop_subtitle_ferry">Ferry</string>
+    <string name="stop_subtitle_transit_hub">Transit hub</string>
+    <string name="stop_subtitle_stop_standalone">Stop</string>
+    <string name="stop_subtitle_platform_suffix"> · Track %1$s</string>
 
     <string name="last_train_list_title">Last / first train</string>
     <string name="last_train_add">Add alert</string>

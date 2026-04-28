@@ -66,6 +66,9 @@ import com.saarlabs.tminus.model.WidgetStationBoardConfig
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.sortStopsWithFavoritesFirst
+import com.saarlabs.tminus.ui.StopSelectionTitleWithSubtitle
+import com.saarlabs.tminus.ui.stopOneLineDisplay
+import com.saarlabs.tminus.ui.stopSelectionSubtitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -279,7 +282,7 @@ private fun StationBoardWidgetConfigScreen(
                     item(key = "stop_chip") {
                         WidgetStopChip(
                             label = stringResource(R.string.widget_station_board_selecting_stop),
-                            stopName = selectedStop!!.resolveParent(globalResponse!!.stops).name,
+                            stop = selectedStop!!.resolveParent(globalResponse!!.stops),
                             onClear = { selectedStop = null },
                         )
                     }
@@ -320,7 +323,7 @@ private fun StationBoardWidgetConfigScreen(
                                 val config =
                                     WidgetStationBoardConfig(
                                         stopId = resolved.id,
-                                        stopLabel = resolved.name,
+                                        stopLabel = stopOneLineDisplay(resolved, context.resources),
                                         routeId = routeId,
                                         destinationHeadsign = destination,
                                     )
@@ -423,7 +426,7 @@ private fun StationBoardWidgetConfigScreen(
                                                 RoundedCornerShape(8.dp),
                                             )
                                             .padding(vertical = 4.dp, horizontal = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                                    verticalAlignment = Alignment.Top,
                                 ) {
                                     IconButton(
                                         onClick = {
@@ -442,9 +445,8 @@ private fun StationBoardWidgetConfigScreen(
                                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    Text(
-                                        text = resolved.name,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                    StopSelectionTitleWithSubtitle(
+                                        stop = resolved,
                                         modifier =
                                             Modifier.weight(1f)
                                                 .clickable {
@@ -554,7 +556,7 @@ private fun RouteFilterSection(
 }
 
 @Composable
-private fun WidgetStopChip(label: String, stopName: String, onClear: () -> Unit) {
+private fun WidgetStopChip(label: String, stop: Stop, onClear: () -> Unit) {
     Row(
         modifier =
             Modifier.padding(vertical = 4.dp)
@@ -563,10 +565,20 @@ private fun WidgetStopChip(label: String, stopName: String, onClear: () -> Unit)
                     RoundedCornerShape(8.dp),
                 )
                 .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
-        Text(text = "$label: $stopName", style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.weight(1f))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "$label: ${stop.name}", style = MaterialTheme.typography.bodyLarge)
+            val sub = stopSelectionSubtitle(stop)
+            if (sub.isNotEmpty()) {
+                Text(
+                    text = sub,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         TextButton(onClick = onClear) {
             Text(stringResource(R.string.widget_clear_stop))
         }

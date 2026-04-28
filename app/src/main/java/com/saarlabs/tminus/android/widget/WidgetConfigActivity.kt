@@ -62,6 +62,9 @@ import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.R
+import com.saarlabs.tminus.ui.StopSelectionTitleWithSubtitle
+import com.saarlabs.tminus.ui.stopOneLineDisplay
+import com.saarlabs.tminus.ui.stopSelectionSubtitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -273,7 +276,7 @@ private fun WidgetConfigScreen(
                     item(key = "from_chip") {
                         WidgetStopChip(
                             label = stringResource(R.string.widget_from),
-                            stopName = fromStop!!.name,
+                            stop = fromStop!!,
                             onClear = {
                                 fromStop = null
                                 toStop = null
@@ -285,7 +288,7 @@ private fun WidgetConfigScreen(
                     item(key = "to_chip") {
                         WidgetStopChip(
                             label = stringResource(R.string.widget_to),
-                            stopName = toStop!!.name,
+                            stop = toStop!!,
                             onClear = { toStop = null },
                         )
                     }
@@ -403,7 +406,7 @@ private fun WidgetConfigScreen(
                                                 RoundedCornerShape(8.dp),
                                             )
                                             .padding(vertical = 4.dp, horizontal = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
+                                    verticalAlignment = Alignment.Top,
                                 ) {
                                     IconButton(
                                         onClick = {
@@ -422,9 +425,8 @@ private fun WidgetConfigScreen(
                                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    Text(
-                                        text = resolved.name,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                    StopSelectionTitleWithSubtitle(
+                                        stop = resolved,
                                         modifier =
                                             Modifier.weight(1f)
                                                 .clickable {
@@ -466,8 +468,16 @@ private fun WidgetConfigScreen(
                                                                     WidgetTripConfig(
                                                                         fromStopId = fromResolved.id,
                                                                         toStopId = toResolved.id,
-                                                                        fromLabel = fromResolved.name,
-                                                                        toLabel = toResolved.name,
+                                                                        fromLabel =
+                                                                            stopOneLineDisplay(
+                                                                                fromResolved,
+                                                                                context.resources,
+                                                                            ),
+                                                                        toLabel =
+                                                                            stopOneLineDisplay(
+                                                                                toResolved,
+                                                                                context.resources,
+                                                                            ),
                                                                     )
                                                             coroutineScope.launch {
                                                                 try {
@@ -530,7 +540,7 @@ private fun WidgetConfigScreen(
 }
 
 @Composable
-private fun WidgetStopChip(label: String, stopName: String, onClear: () -> Unit) {
+private fun WidgetStopChip(label: String, stop: Stop, onClear: () -> Unit) {
     Row(
         modifier =
             Modifier.padding(vertical = 4.dp)
@@ -539,10 +549,20 @@ private fun WidgetStopChip(label: String, stopName: String, onClear: () -> Unit)
                     RoundedCornerShape(8.dp),
                 )
                 .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
-        Text(text = "$label: $stopName", style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.weight(1f))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "$label: ${stop.name}", style = MaterialTheme.typography.bodyLarge)
+            val sub = stopSelectionSubtitle(stop)
+            if (sub.isNotEmpty()) {
+                Text(
+                    text = sub,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         TextButton(onClick = onClear) { Text(stringResource(R.string.widget_clear_stop)) }
     }
 }
