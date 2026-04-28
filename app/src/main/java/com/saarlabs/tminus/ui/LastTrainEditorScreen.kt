@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,6 +52,7 @@ import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.R
+import com.saarlabs.tminus.ui.stopOneLineDisplay
 import com.saarlabs.tminus.features.LastTrainMode
 import com.saarlabs.tminus.features.LastTrainProfile
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +65,7 @@ public fun LastTrainEditorScreen(
     onSave: (LastTrainProfile) -> Unit,
     onCancel: () -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var routeId by remember { mutableStateOf(initial?.routeId ?: "Orange") }
     var directionId by remember { mutableStateOf(initial?.directionId ?: 0) }
@@ -205,7 +208,7 @@ public fun LastTrainEditorScreen(
             Text(
                 stringResource(
                     R.string.last_train_stop_picked,
-                    stop?.name ?: "—",
+                    stop?.let { stopOneLineDisplay(it, context.resources) } ?: "—",
                 ),
             )
         }
@@ -298,7 +301,7 @@ public fun LastTrainEditorScreen(
                         routeId = routeId.trim(),
                         directionId = directionId,
                         stopId = s.id,
-                        stopLabel = s.name,
+                        stopLabel = stopOneLineDisplay(s, context.resources),
                         mode = mode,
                         daysOfWeek = days.sorted(),
                         notifyMinutesBefore = notifyMin.toIntOrNull()?.coerceIn(5, 180) ?: 45,

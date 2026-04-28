@@ -44,12 +44,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.features.LastTrainMode
 import com.saarlabs.tminus.features.LastTrainProfile
 import com.saarlabs.tminus.features.LastTrainRepository
+import com.saarlabs.tminus.model.response.ApiResult
+import com.saarlabs.tminus.model.response.GlobalData
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
@@ -61,12 +66,20 @@ public fun LastTrainListScreen(navController: NavController) {
     val context = LocalContext.current
     val repo = remember { LastTrainRepository(context.applicationContext) }
     var profiles by remember { mutableStateOf<List<LastTrainProfile>>(emptyList()) }
+    var globalData by remember { mutableStateOf<GlobalData?>(null) }
     val scope = rememberCoroutineScope()
     val use24Hour = rememberUse24HourTime()
     val resources = LocalContext.current.resources
 
     LaunchedEffect(Unit) {
         profiles = repo.load()
+    }
+
+    LaunchedEffect(Unit) {
+        when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
+            is ApiResult.Ok -> globalData = r.data
+            is ApiResult.Error -> {}
+        }
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -209,7 +222,7 @@ public fun LastTrainListScreen(navController: NavController) {
                                     Column(Modifier.padding(16.dp)) {
                                         Text(p.name, style = MaterialTheme.typography.titleMedium)
                                         Text(
-                                            "${p.routeId} · ${if (p.mode == LastTrainMode.LAST) stringResource(R.string.last_train_mode_last) else stringResource(R.string.last_train_mode_first)} · ${p.stopLabel.ifBlank { p.stopId }}",
+                                            "${p.routeId} · ${if (p.mode == LastTrainMode.LAST) stringResource(R.string.last_train_mode_last) else stringResource(R.string.last_train_mode_first)} · ${lastTrainStopSummaryLine(p, globalData, resources)}",
                                             style = MaterialTheme.typography.bodySmall,
                                         )
                                         Text(
@@ -226,6 +239,16 @@ public fun LastTrainListScreen(navController: NavController) {
             }
         }
     }
+}
+
+private fun lastTrainStopSummaryLine(
+    p: LastTrainProfile,
+    globalData: GlobalData?,
+    resources: Resources,
+): String {
+    val resolved =
+        globalData?.getStop(p.stopId)?.resolveParent(globalData.stops)?.let { stopOneLineDisplay(it, resources) }
+    return resolved ?: p.stopLabel.ifBlank { p.stopId }
 }
 
 private fun lastTrainTimingSummary(

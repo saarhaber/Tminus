@@ -1,5 +1,6 @@
 package com.saarlabs.tminus.ui
 
+import android.content.res.Resources
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,11 +44,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.features.AccessibilityRepository
 import com.saarlabs.tminus.features.AccessibilityWatch
+import com.saarlabs.tminus.model.response.ApiResult
+import com.saarlabs.tminus.model.response.GlobalData
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
@@ -59,10 +65,18 @@ public fun AccessibilityListScreen(navController: NavController) {
     val context = LocalContext.current
     val repo = remember { AccessibilityRepository(context.applicationContext) }
     var watches by remember { mutableStateOf<List<AccessibilityWatch>>(emptyList()) }
+    var globalData by remember { mutableStateOf<GlobalData?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         watches = repo.load()
+    }
+
+    LaunchedEffect(Unit) {
+        when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
+            is ApiResult.Ok -> globalData = r.data
+            is ApiResult.Error -> {}
+        }
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -205,7 +219,7 @@ public fun AccessibilityListScreen(navController: NavController) {
                                     Column(Modifier.padding(16.dp)) {
                                         Text(w.name, style = MaterialTheme.typography.titleMedium)
                                         Text(
-                                            "${w.routeId} · ${w.stopLabel.ifBlank { w.stopId }}",
+                                            "${w.routeId} · ${accessWatchStopSummaryLine(w, globalData, context.resources)}",
                                             style = MaterialTheme.typography.bodySmall,
                                         )
                                     }
@@ -217,4 +231,14 @@ public fun AccessibilityListScreen(navController: NavController) {
             }
         }
     }
+}
+
+private fun accessWatchStopSummaryLine(
+    w: AccessibilityWatch,
+    globalData: GlobalData?,
+    resources: Resources,
+): String {
+    val resolved =
+        globalData?.getStop(w.stopId)?.resolveParent(globalData.stops)?.let { stopOneLineDisplay(it, resources) }
+    return resolved ?: w.stopLabel.ifBlank { w.stopId }
 }

@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,7 @@ import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.R
+import com.saarlabs.tminus.ui.stopOneLineDisplay
 import com.saarlabs.tminus.features.AccessibilityWatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,6 +59,7 @@ public fun AccessibilityEditorScreen(
     onSave: (AccessibilityWatch) -> Unit,
     onCancel: () -> Unit,
 ) {
+    val context = LocalContext.current
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var routeId by remember { mutableStateOf(initial?.routeId ?: "Orange") }
     var stop by remember { mutableStateOf<Stop?>(null) }
@@ -162,7 +165,7 @@ public fun AccessibilityEditorScreen(
             Text(
                 stringResource(
                     R.string.access_stop_picked,
-                    stop?.name ?: "—",
+                    stop?.let { stopOneLineDisplay(it, context.resources) } ?: "—",
                 ),
             )
         }
@@ -195,7 +198,7 @@ public fun AccessibilityEditorScreen(
                         name = name.trim(),
                         routeId = routeId.trim(),
                         stopId = s.id,
-                        stopLabel = s.name,
+                        stopLabel = stopOneLineDisplay(s, context.resources),
                         enabled = enabled,
                     ),
                 )

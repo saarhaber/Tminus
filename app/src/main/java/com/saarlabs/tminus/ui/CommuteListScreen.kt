@@ -1,5 +1,6 @@
 package com.saarlabs.tminus.ui
 
+import android.content.res.Resources
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,9 +46,14 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
+import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.commute.CommuteProfile
 import com.saarlabs.tminus.commute.CommuteRepository
+import com.saarlabs.tminus.model.response.ApiResult
+import com.saarlabs.tminus.model.response.GlobalData
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
@@ -62,11 +68,19 @@ public fun CommuteListScreen(
     val context = LocalContext.current
     val repo = remember(context) { CommuteRepository(context) }
     var profiles by remember { mutableStateOf<List<CommuteProfile>>(emptyList()) }
+    var globalData by remember { mutableStateOf<GlobalData?>(null) }
     val scope = rememberCoroutineScope()
     val use24Hour = rememberUse24HourTime()
 
     LaunchedEffect(Unit) {
         profiles = repo.loadProfiles()
+    }
+
+    LaunchedEffect(Unit) {
+        when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
+            is ApiResult.Ok -> globalData = r.data
+            is ApiResult.Error -> {}
+        }
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -209,7 +223,7 @@ public fun CommuteListScreen(
                                     Column(Modifier.padding(16.dp)) {
                                         Text(p.name, style = MaterialTheme.typography.titleMedium)
                                         Text(
-                                            "${p.fromLabel.ifBlank { p.fromStopId }} → ${p.toLabel.ifBlank { p.toStopId }}",
+                                            commuteRouteSummaryText(p, globalData, context.resources),
                                             style = MaterialTheme.typography.bodyMedium,
                                         )
                                         Text(
@@ -233,4 +247,22 @@ public fun CommuteListScreen(
             }
         }
     }
+}
+
+private fun commuteRouteSummaryText(
+    p: CommuteProfile,
+    globalData: GlobalData?,
+    resources: Resources,
+): String {
+    val from =
+        globalData?.getStop(p.fromStopId)?.resolveParent(globalData.stops)?.let {
+            stopOneLineDisplay(it, resources)
+        }
+            ?: p.fromLabel.ifBlank { p.fromStopId }
+    val to =
+        globalData?.getStop(p.toStopId)?.resolveParent(globalData.stops)?.let {
+            stopOneLineDisplay(it, resources)
+        }
+            ?: p.toLabel.ifBlank { p.toStopId }
+    return "$from → $to"
 }
