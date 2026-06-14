@@ -58,19 +58,7 @@ internal class WidgetPreferences(private val context: Context) {
             val value =
                 listOf(config.fromStopId, config.toStopId, config.fromLabel, config.toLabel)
                     .joinToString("\n")
-            val ok = prefs.edit().putString(configKey(appWidgetId), value).commit()
-            // #region agent log
-            AgentDebugLog.log(
-                "WidgetPreferences.kt:setConfig",
-                "trip prefs commit",
-                "H3",
-                mapOf(
-                    "appWidgetId" to appWidgetId,
-                    "prefsKey" to configKey(appWidgetId),
-                    "commitOk" to ok,
-                ),
-            )
-            // #endregion
+            prefs.edit().putString(configKey(appWidgetId), value).commit()
         }
 
     suspend fun removeConfig(appWidgetId: Int) =
@@ -112,19 +100,7 @@ internal class WidgetPreferences(private val context: Context) {
                         config.destinationHeadsign ?: "",
                     )
                     .joinToString("\n")
-            val ok = prefs.edit().putString(stationBoardConfigKey(appWidgetId), value).commit()
-            // #region agent log
-            AgentDebugLog.log(
-                "WidgetPreferences.kt:setStationBoardConfig",
-                "station board prefs commit",
-                "H3",
-                mapOf(
-                    "appWidgetId" to appWidgetId,
-                    "prefsKey" to stationBoardConfigKey(appWidgetId),
-                    "commitOk" to ok,
-                ),
-            )
-            // #endregion
+            prefs.edit().putString(stationBoardConfigKey(appWidgetId), value).commit()
         }
 
     suspend fun removeStationBoardConfig(appWidgetId: Int) =

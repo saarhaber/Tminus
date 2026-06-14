@@ -89,20 +89,6 @@ public class WidgetConfigActivity : ComponentActivity() {
         if (usedPendingFallback) {
             appWidgetId = widgetPreferences.getAndClearPendingConfigWidgetId()
         }
-        // #region agent log
-        AgentDebugLog.log(
-            "WidgetConfigActivity.kt:onCreate",
-            "trip configure id resolution",
-            "H1",
-            mapOf(
-                "activity" to "trip",
-                "extraFromIntent" to extraFromIntent,
-                "usedPendingFallback" to usedPendingFallback,
-                "finalAppWidgetId" to appWidgetId,
-                "willFinishInvalid" to (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID),
-            ),
-        )
-        // #endregion
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()

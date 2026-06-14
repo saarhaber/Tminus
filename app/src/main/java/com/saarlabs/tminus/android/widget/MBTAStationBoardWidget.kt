@@ -87,24 +87,17 @@ public class MBTAStationBoardWidget : GlanceAppWidget() {
             return
         }
 
-        var config = withContext(Dispatchers.IO) { widgetPreferences.getStationBoardConfigOnce(appWidgetId) }
+        // getStationBoardConfigOnce already dispatches to Dispatchers.IO internally.
+        var config = widgetPreferences.getStationBoardConfigOnce(appWidgetId)
         if (config == null) {
             // Config may land milliseconds after Glance starts composing (save vs update race).
             repeat(36) {
                 delay(200)
-                config = withContext(Dispatchers.IO) { widgetPreferences.getStationBoardConfigOnce(appWidgetId) }
+                config = widgetPreferences.getStationBoardConfigOnce(appWidgetId)
                 if (config != null) return@repeat
             }
         }
         if (config == null) {
-            // #region agent log
-            AgentDebugLog.log(
-                "MBTAStationBoardWidget.kt:provideGlanceInternal",
-                "showing station configure prompt (no saved config)",
-                "H4",
-                mapOf("appWidgetId" to appWidgetId),
-            )
-            // #endregion
             withContext(Dispatchers.IO) {
                 widgetPreferences.setPendingStationBoardConfigWidgetId(appWidgetId)
             }
@@ -358,7 +351,7 @@ private object StationBoardContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surfaceColor(context))
-                        .cornerRadius(22.dp),
+                        .cornerRadius(24.dp),
             ) {
                 // Match board chrome: thin header strip so setup empty states feel cohesive.
                 Column(
@@ -439,7 +432,7 @@ private object StationBoardContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surfaceColor(context))
-                        .cornerRadius(22.dp)
+                        .cornerRadius(24.dp)
                         .padding(t.padding)
                         .clickable(actionStartActivity<MainActivity>()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -470,7 +463,7 @@ private object StationBoardContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surfaceColor(context))
-                        .cornerRadius(22.dp)
+                        .cornerRadius(24.dp)
                         .padding(t.padding)
                         .clickable(actionStartActivity<MainActivity>()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -521,7 +514,7 @@ private object StationBoardContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surfaceColor(context))
-                        .cornerRadius(22.dp),
+                        .cornerRadius(24.dp),
             ) {
                 // Colorful header band
                 Column(
