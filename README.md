@@ -4,6 +4,13 @@
 
 Open-source Android widgets and tools for MBTA riders. Application ID: **`com.saarlabs.tminus`**. The first feature is a **home screen trip widget** (Jetpack Glance) based on the contribution in [mbta/mobile_app#1593](https://github.com/mbta/mobile_app/pull/1593), adapted to call the public **MBTA V3 API** directly.
 
+**Home screen widgets** (all Jetpack Glance, available from the system widget picker):
+
+- **Next trip** — next scheduled trip between two stops, with countdown and departure/arrival times.
+- **Station board** — upcoming scheduled departures at one stop, with line colors and countdown.
+- **Favorite stops** — the next scheduled departure from each of your favorite stops. Configure how many stops to show (3/5/8) and optionally sort by soonest departure.
+- **Service alerts** — active service alerts across the subway lines. Configure which lines to watch (Red / Orange / Blue / Green / Mattapan).
+
 The in-app UI uses bottom navigation: **Home** and **Settings** (API keys, time format, documentation links, and community / contribution links).
 
 **Commutes** (from Home): save **multiple** named routes (from/to stops), **days of week**, a **target time**, and a **window** (minutes before/after) used to query schedules. Set **notify X minutes before departure** for a “time to leave” notification, and optionally a second ping around **scheduled arrival**. Checks run on a background schedule (about every 15 minutes) using **schedule data** from the MBTA V3 API—not live predictions. Grant **notification permission** on Android 13+ when prompted.
@@ -21,6 +28,10 @@ The in-app UI uses bottom navigation: **Home** and **Settings** (API keys, time 
 **Trip widget and station board widget** (in-app preview):
 
 <img src="screenshots/widgets-trip-and-station-preview.png" alt="tMinus trip widget and station board widget previews" width="350" />
+
+**Favorite stops & Service alerts widgets** (design preview):
+
+<img src="screenshots/widgets-favorites-and-alerts.png" alt="tMinus favorite stops widget and service alerts widget" width="600" />
 
 **App UI** (earlier screenshot):
 
