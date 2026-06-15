@@ -76,6 +76,24 @@ internal suspend fun updateStationBoardWidgetWithRetry(context: Context, appWidg
     )
 }
 
+/** Same as [updateTripWidgetWithRetry] for the favorites widget. */
+internal suspend fun updateFavoritesWidgetWithRetry(context: Context, appWidgetId: Int) {
+    updateGlanceWidgetWithRetry(
+        context = context,
+        appWidgetId = appWidgetId,
+        widget = MBTAFavoritesWidget(),
+    )
+}
+
+/** Same as [updateTripWidgetWithRetry] for the service alerts widget. */
+internal suspend fun updateAlertsWidgetWithRetry(context: Context, appWidgetId: Int) {
+    updateGlanceWidgetWithRetry(
+        context = context,
+        appWidgetId = appWidgetId,
+        widget = MBTAAlertsWidget(),
+    )
+}
+
 private suspend fun updateGlanceWidgetWithRetry(
     context: Context,
     appWidgetId: Int,

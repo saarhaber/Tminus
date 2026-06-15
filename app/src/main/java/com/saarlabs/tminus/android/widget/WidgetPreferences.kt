@@ -2,6 +2,8 @@ package com.saarlabs.tminus.android.widget
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
+import com.saarlabs.tminus.model.WidgetAlertsConfig
+import com.saarlabs.tminus.model.WidgetFavoritesConfig
 import com.saarlabs.tminus.model.WidgetStationBoardConfig
 import com.saarlabs.tminus.model.WidgetTripConfig
 import kotlinx.coroutines.Dispatchers
@@ -106,5 +108,47 @@ internal class WidgetPreferences(private val context: Context) {
     suspend fun removeStationBoardConfig(appWidgetId: Int) =
         withContext(Dispatchers.IO) {
             prefs.edit().remove(stationBoardConfigKey(appWidgetId)).commit()
+        }
+
+    private fun favoritesConfigKey(appWidgetId: Int) = "favorites_config_$appWidgetId"
+
+    suspend fun getFavoritesConfigOnce(appWidgetId: Int): WidgetFavoritesConfig? =
+        withContext(Dispatchers.IO) {
+            val raw = prefs.getString(favoritesConfigKey(appWidgetId), null) ?: return@withContext null
+            val lines = raw.split("\n")
+            val count = lines.getOrNull(0)?.trim()?.toIntOrNull() ?: return@withContext null
+            val sortBySoonest = lines.getOrNull(1)?.trim()?.toBoolean() ?: false
+            WidgetFavoritesConfig(count = count, sortBySoonest = sortBySoonest)
+        }
+
+    suspend fun setFavoritesConfig(appWidgetId: Int, config: WidgetFavoritesConfig) =
+        withContext(Dispatchers.IO) {
+            val value = "${config.count}\n${config.sortBySoonest}"
+            prefs.edit().putString(favoritesConfigKey(appWidgetId), value).commit()
+        }
+
+    suspend fun removeFavoritesConfig(appWidgetId: Int) =
+        withContext(Dispatchers.IO) {
+            prefs.edit().remove(favoritesConfigKey(appWidgetId)).commit()
+        }
+
+    private fun alertsConfigKey(appWidgetId: Int) = "alerts_config_$appWidgetId"
+
+    suspend fun getAlertsConfigOnce(appWidgetId: Int): WidgetAlertsConfig? =
+        withContext(Dispatchers.IO) {
+            val raw = prefs.getString(alertsConfigKey(appWidgetId), null) ?: return@withContext null
+            val ids = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            WidgetAlertsConfig(lineGroupIds = ids)
+        }
+
+    suspend fun setAlertsConfig(appWidgetId: Int, config: WidgetAlertsConfig) =
+        withContext(Dispatchers.IO) {
+            val value = config.lineGroupIds.joinToString(",")
+            prefs.edit().putString(alertsConfigKey(appWidgetId), value).commit()
+        }
+
+    suspend fun removeAlertsConfig(appWidgetId: Int) =
+        withContext(Dispatchers.IO) {
+            prefs.edit().remove(alertsConfigKey(appWidgetId)).commit()
         }
 }

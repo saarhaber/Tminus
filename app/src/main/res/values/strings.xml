@@ -240,6 +240,9 @@
     <string name="widget_favorites_subtitle">Next departures</string>
     <string name="widget_favorites_empty">Add favorite stops in tMinus to see them here.</string>
     <string name="widget_favorites_error">Departures unavailable. Open tMinus or check your connection.</string>
+    <string name="widget_favorites_configure_title">Favorite stops widget</string>
+    <string name="widget_favorites_count_label">Stops to show</string>
+    <string name="widget_favorites_sort_soonest">Show soonest departures first</string>
 
     <!-- Subway alerts widget -->
     <string name="widget_alerts_label">Service alerts</string>
@@ -247,4 +250,11 @@
     <string name="widget_alerts_subtitle">Subway lines</string>
     <string name="widget_alerts_none">All lines running normally.</string>
     <string name="widget_alerts_error">Alerts unavailable. Open tMinus or check your connection.</string>
+    <string name="widget_alerts_configure_title">Service alerts widget</string>
+    <string name="widget_alerts_lines_label">Lines to watch</string>
+    <string name="widget_alerts_line_red">Red Line</string>
+    <string name="widget_alerts_line_orange">Orange Line</string>
+    <string name="widget_alerts_line_blue">Blue Line</string>
+    <string name="widget_alerts_line_green">Green Line</string>
+    <string name="widget_alerts_line_mattapan">Mattapan Line</string>
 </resources>

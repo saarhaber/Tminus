@@ -6,9 +6,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import android.appwidget.AppWidgetManager
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -52,7 +54,7 @@ public class MBTAAlertsWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         try {
-            provideGlanceInternal(context)
+            provideGlanceInternal(context, id)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -63,15 +65,25 @@ public class MBTAAlertsWidget : GlanceAppWidget() {
         }
     }
 
-    private suspend fun provideGlanceInternal(context: Context) {
+    private suspend fun provideGlanceInternal(context: Context, id: GlanceId) {
         GlobalDataStore.awaitClientReady()
         if (!GlobalDataStore.isClientReady()) {
             provideContent { AlertsContent.Board(context, error = true, alerts = emptyList()) }
             return
         }
+        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val config =
+            if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+                null
+            } else {
+                withContext(Dispatchers.IO) {
+                    WidgetPreferences(context.applicationContext).getAlertsConfigOnce(appWidgetId)
+                }
+            }
+        val routeFilter = AlertsWidgetLines.filterFor(config?.lineGroupIds ?: emptyList())
         val result =
             withContext(Dispatchers.IO) {
-                GlobalDataStore.client.fetchAlertsForRoute(SUBWAY_ROUTE_FILTER)
+                GlobalDataStore.client.fetchAlertsForRoute(routeFilter)
             }
         when (result) {
             is ApiResult.Error ->
@@ -85,8 +97,6 @@ public class MBTAAlertsWidget : GlanceAppWidget() {
 
     private companion object {
         const val MAX_ALERTS = 8
-        const val SUBWAY_ROUTE_FILTER =
-            "Red,Orange,Blue,Green-B,Green-C,Green-D,Green-E,Mattapan"
     }
 }
 
