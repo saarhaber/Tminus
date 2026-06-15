@@ -11,7 +11,9 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
+import android.appwidget.AppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
@@ -69,7 +71,7 @@ public class MBTAFavoritesWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         try {
-            provideGlanceInternal(context)
+            provideGlanceInternal(context, id)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -80,7 +82,7 @@ public class MBTAFavoritesWidget : GlanceAppWidget() {
         }
     }
 
-    private suspend fun provideGlanceInternal(context: Context) {
+    private suspend fun provideGlanceInternal(context: Context, id: GlanceId) {
         GlobalDataStore.awaitClientReady()
         val use24Hour =
             withContext(Dispatchers.IO) {
@@ -88,10 +90,21 @@ public class MBTAFavoritesWidget : GlanceAppWidget() {
                     .getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
                     .getBoolean(SettingsKeys.KEY_USE_24_HOUR, false)
             }
+        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val config =
+            if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+                null
+            } else {
+                withContext(Dispatchers.IO) {
+                    WidgetPreferences(context.applicationContext).getFavoritesConfigOnce(appWidgetId)
+                }
+            }
+        val count = (config?.count ?: DEFAULT_FAVORITES).coerceIn(1, MAX_FAVORITES)
+        val sortBySoonest = config?.sortBySoonest ?: false
         val favoriteIds =
             withContext(Dispatchers.IO) {
                 FavoriteStopsStore(context.applicationContext).getIds().toList()
-            }.take(MAX_FAVORITES)
+            }.take(count)
 
         if (favoriteIds.isEmpty()) {
             provideContent {
@@ -139,11 +152,21 @@ public class MBTAFavoritesWidget : GlanceAppWidget() {
                 }
             }
 
-        provideContent { FavoritesContent.Board(context, rows, use24Hour) }
+        // Soonest first puts stops with an upcoming departure at the top (by minutes), then the
+        // stops with no departure; otherwise keep the user's favorites order.
+        val orderedRows =
+            if (sortBySoonest) {
+                rows.sortedBy { it.departure?.minutesUntil ?: Int.MAX_VALUE }
+            } else {
+                rows
+            }
+
+        provideContent { FavoritesContent.Board(context, orderedRows, use24Hour) }
     }
 
     private companion object {
-        const val MAX_FAVORITES = 5
+        const val MAX_FAVORITES = 8
+        const val DEFAULT_FAVORITES = 5
     }
 }
 

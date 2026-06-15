@@ -48,6 +48,24 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.saarlabs.tminus.android.widget.FavoritesWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Tminus">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="com.saarlabs.tminus.android.widget.AlertsWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Tminus">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name="com.saarlabs.tminus.android.widget.MBTATripWidgetReceiver"
             android:exported="true"
