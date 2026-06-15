@@ -233,4 +233,18 @@
     <string name="widget_station_board_route_all">All lines</string>
     <string name="widget_station_board_loading_routes">Loading lines…</string>
     <string name="widget_station_board_save">Add widget</string>
+
+    <!-- Favorites departures widget -->
+    <string name="widget_favorites_label">Favorite stops</string>
+    <string name="widget_favorites_description">Next scheduled departure from each of your favorite stops.</string>
+    <string name="widget_favorites_subtitle">Next departures</string>
+    <string name="widget_favorites_empty">Add favorite stops in tMinus to see them here.</string>
+    <string name="widget_favorites_error">Departures unavailable. Open tMinus or check your connection.</string>
+
+    <!-- Subway alerts widget -->
+    <string name="widget_alerts_label">Service alerts</string>
+    <string name="widget_alerts_description">Active service alerts across the subway lines.</string>
+    <string name="widget_alerts_subtitle">Subway lines</string>
+    <string name="widget_alerts_none">All lines running normally.</string>
+    <string name="widget_alerts_error">Alerts unavailable. Open tMinus or check your connection.</string>
 </resources>

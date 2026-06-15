@@ -85,25 +85,18 @@ public class MBTATripWidget : GlanceAppWidget() {
             return
         }
 
-        var config = withContext(Dispatchers.IO) { widgetPreferences.getConfigOnce(appWidgetId) }
+        // getConfigOnce already dispatches to Dispatchers.IO internally.
+        var config = widgetPreferences.getConfigOnce(appWidgetId)
         if (config == null) {
             repeat(36) {
                 delay(200)
-                config = withContext(Dispatchers.IO) { widgetPreferences.getConfigOnce(appWidgetId) }
+                config = widgetPreferences.getConfigOnce(appWidgetId)
                 if (config != null) return@repeat
             }
         }
         if (config == null) {
-            // #region agent log
-            AgentDebugLog.log(
-                "MBTATripWidget.kt:provideGlanceInternal",
-                "showing trip configure prompt (no saved config)",
-                "H4",
-                mapOf("appWidgetId" to appWidgetId),
-            )
-            // #endregion
             withContext(Dispatchers.IO) {
-                WidgetPreferences(context.applicationContext).setPendingConfigWidgetId(appWidgetId)
+                widgetPreferences.setPendingConfigWidgetId(appWidgetId)
             }
             provideContent {
                 WidgetContent.ConfigurePrompt(context = context, appWidgetId = appWidgetId)
@@ -265,7 +258,7 @@ private object WidgetContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surface(context))
-                        .cornerRadius(20.dp)
+                        .cornerRadius(24.dp)
                         .padding(t.padding)
                         .clickable(
                             androidx.glance.appwidget.action.actionStartActivity(
@@ -306,8 +299,8 @@ private object WidgetContent {
                     modifier =
                         GlanceModifier
                             .background(accent(context))
-                            .cornerRadius(20.dp)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .cornerRadius(999.dp)
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
                 ) {
                     Text(
                         text = context.getString(R.string.widget_configure),
@@ -333,7 +326,7 @@ private object WidgetContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surface(context))
-                        .cornerRadius(20.dp)
+                        .cornerRadius(24.dp)
                         .padding(t.padding)
                         .clickable(actionStartActivity<MainActivity>()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -366,7 +359,7 @@ private object WidgetContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surface(context))
-                        .cornerRadius(20.dp)
+                        .cornerRadius(24.dp)
                         .padding(t.padding)
                         .clickable(actionStartActivity<MainActivity>()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -410,7 +403,7 @@ private object WidgetContent {
                 modifier =
                     GlanceModifier.fillMaxSize()
                         .background(surface(context))
-                        .cornerRadius(20.dp)
+                        .cornerRadius(24.dp)
                         .padding(t.padding)
                         .clickable(actionStartActivity<MainActivity>()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -469,7 +462,7 @@ private object WidgetContent {
             val t = typography(fontScale)
             val baseSurface =
                 GlanceModifier.fillMaxSize()
-                    .cornerRadius(20.dp)
+                    .cornerRadius(24.dp)
                     .clickable(actionStartActivity<MainActivity>())
             if (tripData.route.type == RouteType.COMMUTER_RAIL) {
                 TripWidgetCommuterLayouts.CommuterRailTrip(

@@ -94,20 +94,6 @@ public class StationBoardWidgetConfigActivity : ComponentActivity() {
         if (usedPendingFallback) {
             appWidgetId = widgetPreferences.getAndClearPendingStationBoardConfigWidgetId()
         }
-        // #region agent log
-        AgentDebugLog.log(
-            "StationBoardWidgetConfigActivity.kt:onCreate",
-            "station configure id resolution",
-            "H1",
-            mapOf(
-                "activity" to "station_board",
-                "extraFromIntent" to extraFromIntent,
-                "usedPendingFallback" to usedPendingFallback,
-                "finalAppWidgetId" to appWidgetId,
-                "willFinishInvalid" to (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID),
-            ),
-        )
-        // #endregion
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()

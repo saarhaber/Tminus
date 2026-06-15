@@ -79,6 +79,36 @@
         </receiver>
 
         <receiver
+            android:name="com.saarlabs.tminus.android.widget.MBTAFavoritesWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_favorites_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.glance.appwidget.GlanceAppWidget"
+                android:value="com.saarlabs.tminus.android.widget.MBTAFavoritesWidget" />
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mbta_favorites_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.saarlabs.tminus.android.widget.MBTAAlertsWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_alerts_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.glance.appwidget.GlanceAppWidget"
+                android:value="com.saarlabs.tminus.android.widget.MBTAAlertsWidget" />
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mbta_alerts_widget_info" />
+        </receiver>
+
+        <receiver
             android:name="com.saarlabs.tminus.android.widget.WidgetTickReceiver"
             android:exported="false" />
     </application>

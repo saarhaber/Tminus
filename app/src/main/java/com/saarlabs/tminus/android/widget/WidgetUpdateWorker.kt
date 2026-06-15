@@ -84,33 +84,10 @@ private suspend fun updateGlanceWidgetWithRetry(
     val glanceAppWidgetManager = GlanceAppWidgetManager(context.applicationContext)
     repeat(WidgetUpdateWorker.MAX_RETRIES) { attempt ->
         if (tryUpdateGlanceWidget(context, glanceAppWidgetManager, appWidgetId, widget)) {
-            // #region agent log
-            AgentDebugLog.log(
-                "WidgetUpdateWorker.kt:updateGlanceWidgetWithRetry",
-                "glance update ok",
-                "H5",
-                mapOf(
-                    "appWidgetId" to appWidgetId,
-                    "widgetClass" to widget::class.java.simpleName,
-                    "attempt" to (attempt + 1),
-                ),
-            )
-            // #endregion
             return
         }
         if (attempt < WidgetUpdateWorker.MAX_RETRIES - 1) delay(WidgetUpdateWorker.RETRY_DELAY_MS)
     }
-    // #region agent log
-    AgentDebugLog.log(
-        "WidgetUpdateWorker.kt:updateGlanceWidgetWithRetry",
-        "glance update failed after retries",
-        "H5",
-        mapOf(
-            "appWidgetId" to appWidgetId,
-            "widgetClass" to widget::class.java.simpleName,
-        ),
-    )
-    // #endregion
 }
 
 public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParameters) :
