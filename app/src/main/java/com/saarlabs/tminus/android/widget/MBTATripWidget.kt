@@ -87,12 +87,11 @@ public class MBTATripWidget : GlanceAppWidget() {
 
         // getConfigOnce already dispatches to Dispatchers.IO internally.
         var config = widgetPreferences.getConfigOnce(appWidgetId)
-        if (config == null) {
-            repeat(36) {
-                delay(200)
-                config = widgetPreferences.getConfigOnce(appWidgetId)
-                if (config != null) return@repeat
-            }
+        // Config may land milliseconds after Glance starts composing (save vs update race).
+        var attempts = 0
+        while (config == null && attempts++ < CONFIG_WAIT_ATTEMPTS) {
+            delay(CONFIG_WAIT_DELAY_MS)
+            config = widgetPreferences.getConfigOnce(appWidgetId)
         }
         if (config == null) {
             withContext(Dispatchers.IO) {

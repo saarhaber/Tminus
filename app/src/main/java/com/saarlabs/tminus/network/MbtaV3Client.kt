@@ -223,6 +223,9 @@ public class MbtaV3Client(private val apiKey: String?) {
         allStops: Map<String, Stop>,
     ): ApiResult<List<Stop>> =
         withContext(Dispatchers.IO) {
+            // Includes stops returned via `include=stop` on the sampled trips, which are often
+            // missing from the cached catalog (e.g. platform stops loaded lazily).
+            val stopsById = allStops.toMutableMap()
             val primaryResult =
                 try {
                     val reachable = mutableSetOf<String>()
@@ -250,7 +253,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                                     }
                                     .body<JsonObject>()
 
-                            mergeIncludedStops(schedDoc, allStops.toMutableMap())
+                            mergeIncludedStops(schedDoc, stopsById)
 
                             val schedData = schedDoc.get("data")?.asJsonArrayOrNull() ?: continue
                             val orderedStopIds =
@@ -269,15 +272,15 @@ public class MbtaV3Client(private val apiKey: String?) {
 
                             val fromIdx =
                                 orderedStopIds.indexOfFirst { sid ->
-                                    Stop.equalOrFamily(sid, fromStopId, allStops)
+                                    Stop.equalOrFamily(sid, fromStopId, stopsById)
                                 }
                             if (fromIdx < 0) continue
                             for (i in orderedStopIds.indices) {
                                 if (i == fromIdx) continue
                                 val sid = orderedStopIds[i]
-                                if (Stop.equalOrFamily(sid, fromStopId, allStops)) continue
-                                val raw = allStops[sid] ?: continue
-                                val parent = raw.resolveParent(allStops)
+                                if (Stop.equalOrFamily(sid, fromStopId, stopsById)) continue
+                                val raw = stopsById[sid] ?: continue
+                                val parent = raw.resolveParent(stopsById)
                                 reachable.add(parent.id)
                             }
                         }
@@ -285,7 +288,7 @@ public class MbtaV3Client(private val apiKey: String?) {
 
                     ApiResult.Ok(
                         reachable
-                            .mapNotNull { allStops[it] }
+                            .mapNotNull { stopsById[it] }
                             .filter { it.parentStationId == null }
                             .sortedBy { it.name },
                     )

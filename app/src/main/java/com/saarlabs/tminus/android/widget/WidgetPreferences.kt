@@ -13,6 +13,10 @@ private const val PREFS_NAME = "widget_config"
 private const val KEY_PENDING_CONFIG_WIDGET_ID = "pending_config_widget_id"
 private const val KEY_PENDING_STATION_BOARD_WIDGET_ID = "pending_station_board_widget_id"
 
+/** How long widgets poll for a config that may be written concurrently (save vs update race). */
+internal const val CONFIG_WAIT_ATTEMPTS: Int = 36
+internal const val CONFIG_WAIT_DELAY_MS: Long = 200L
+
 internal class WidgetPreferences(private val context: Context) {
 
     private val prefs

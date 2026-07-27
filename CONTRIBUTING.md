@@ -14,7 +14,8 @@ Thanks for helping improve tMinus. This project welcomes contributions from the 
 1. [Android Studio](https://developer.android.com/studio) (recommended) or Android SDK with `ANDROID_HOME` / `local.properties` set.
 2. Clone the repository and open the project root in Android Studio.
 3. Build: `./gradlew assembleDebug`
-4. Run on an emulator or device (API 26+).
+4. Run unit tests: `./gradlew :network-json:test :app:testDebugUnitTest`
+5. Run on an emulator or device (API 26+).
 
 Optional: add an MBTA V3 API key in **Settings** in the app for higher rate limits while developing.
 
@@ -28,6 +29,7 @@ Optional: add an MBTA V3 API key in **Settings** in the app for higher rate limi
 ## Pull request checklist
 
 - [ ] Builds successfully (`./gradlew assembleDebug`).
+- [ ] Unit tests pass (`./gradlew :network-json:test :app:testDebugUnitTest`).
 - [ ] New user-facing strings are in `res/values/strings.xml` (or appropriate qualifiers) when needed.
 - [ ] Briefly describe the change and testing in the PR body.
 

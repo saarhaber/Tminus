@@ -89,13 +89,11 @@ public class MBTAStationBoardWidget : GlanceAppWidget() {
 
         // getStationBoardConfigOnce already dispatches to Dispatchers.IO internally.
         var config = widgetPreferences.getStationBoardConfigOnce(appWidgetId)
-        if (config == null) {
-            // Config may land milliseconds after Glance starts composing (save vs update race).
-            repeat(36) {
-                delay(200)
-                config = widgetPreferences.getStationBoardConfigOnce(appWidgetId)
-                if (config != null) return@repeat
-            }
+        // Config may land milliseconds after Glance starts composing (save vs update race).
+        var attempts = 0
+        while (config == null && attempts++ < CONFIG_WAIT_ATTEMPTS) {
+            delay(CONFIG_WAIT_DELAY_MS)
+            config = widgetPreferences.getStationBoardConfigOnce(appWidgetId)
         }
         if (config == null) {
             withContext(Dispatchers.IO) {
