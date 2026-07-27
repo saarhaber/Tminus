@@ -68,4 +68,6 @@ dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.compose.reorderable)
     implementation(project(":network-json"))
+    testImplementation(libs.junit)
+    testImplementation(kotlin("test"))
 }

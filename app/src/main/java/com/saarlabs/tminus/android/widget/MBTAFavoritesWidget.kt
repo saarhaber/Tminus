@@ -50,6 +50,9 @@ import com.saarlabs.tminus.usecases.WidgetStationBoardUseCase
 import com.saarlabs.tminus.util.EasternTimeInstant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 
 internal data class FavoriteDepartureRow(
@@ -128,27 +131,35 @@ public class MBTAFavoritesWidget : GlanceAppWidget() {
                     }
             }
 
+        // One schedules request per favorite; fetch them concurrently so the widget renders in
+        // roughly one round-trip instead of N.
         val rows =
             withContext(Dispatchers.IO) {
-                favoriteIds.mapNotNull { favId ->
-                    val stop = globalData.getStop(favId) ?: return@mapNotNull null
-                    val name = stop.resolveParent(globalData.stops).name
-                    val departure =
-                        when (
-                            val res =
-                                useCase.getDepartures(
-                                    globalData = globalData,
-                                    stopId = favId,
-                                    routeFilter = null,
-                                    destinationFilter = null,
-                                    now = EasternTimeInstant.now(),
-                                    limit = 1,
-                                )
-                        ) {
-                            is ApiResult.Ok -> res.data.departures.firstOrNull()
-                            is ApiResult.Error -> null
+                coroutineScope {
+                    favoriteIds
+                        .mapNotNull { favId -> globalData.getStop(favId)?.let { favId to it } }
+                        .map { (favId, stop) ->
+                            async {
+                                val name = stop.resolveParent(globalData.stops).name
+                                val departure =
+                                    when (
+                                        val res =
+                                            useCase.getDepartures(
+                                                globalData = globalData,
+                                                stopId = favId,
+                                                routeFilter = null,
+                                                destinationFilter = null,
+                                                now = EasternTimeInstant.now(),
+                                                limit = 1,
+                                            )
+                                    ) {
+                                        is ApiResult.Ok -> res.data.departures.firstOrNull()
+                                        is ApiResult.Error -> null
+                                    }
+                                FavoriteDepartureRow(stopName = name, departure = departure)
+                            }
                         }
-                    FavoriteDepartureRow(stopName = name, departure = departure)
+                        .awaitAll()
                 }
             }
 

@@ -13,6 +13,12 @@ internal object SettingsKeys {
     /** Parent stop ids the user starred; used to pin stations to the top of stop lists. */
     const val KEY_FAVORITE_STOP_IDS = "favorite_stop_ids"
     /**
+     * Same favorites as [KEY_FAVORITE_STOP_IDS] but newline-joined in the order the user starred
+     * them. String sets have no stable iteration order, and the favorites widget shows "first N",
+     * so order matters. The legacy set is kept in sync for backwards compatibility.
+     */
+    const val KEY_FAVORITE_STOP_IDS_ORDERED = "favorite_stop_ids_ordered"
+    /**
      * Text scale multiplier (stored as Int percent, 80..160) applied across the app and home-screen
      * widgets. Defaults to 100 (= 1.0x).
      */

@@ -17,9 +17,11 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 
 /**
- * Updates a single Glance widget instance. Tries [GlanceAppWidgetManager.getGlanceIdBy] first; if Glance
- * has not registered that appWidgetId yet (common right after configuration), falls back to scanning
- * [GlanceAppWidgetManager.getGlanceIds] and matching [GlanceAppWidgetManager.getAppWidgetId].
+ * Updates a single Glance widget instance by scanning [GlanceAppWidgetManager.getGlanceIds] for
+ * [widget]'s own provider class and matching [GlanceAppWidgetManager.getAppWidgetId]. Scanning the
+ * per-provider registry (instead of the unchecked [GlanceAppWidgetManager.getGlanceIdBy]) guarantees
+ * we never compose one widget type's content into another provider's instance; if Glance has not
+ * registered the id yet (common right after configuration), this returns false and callers retry.
  */
 private suspend fun tryUpdateGlanceWidget(
     context: Context,
@@ -28,13 +30,6 @@ private suspend fun tryUpdateGlanceWidget(
     widget: GlanceAppWidget,
 ): Boolean {
     val appCtx = context.applicationContext
-    try {
-        val glanceId = glanceAppWidgetManager.getGlanceIdBy(appWidgetId)
-        widget.update(appCtx, glanceId)
-        return true
-    } catch (_: IllegalArgumentException) {
-        // Registry not ready — fall through.
-    }
     return try {
         val glanceIds = glanceAppWidgetManager.getGlanceIds(widget.javaClass)
         for (glanceId in glanceIds) {
@@ -111,69 +106,83 @@ private suspend fun updateGlanceWidgetWithRetry(
 public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParameters) :
     CoroutineWorker(appContext, workerParams) {
 
+    /** Every widget provider this worker refreshes, with a factory for its Glance widget. */
+    private data class Provider(
+        val receiver: Class<out android.content.BroadcastReceiver>,
+        val newWidget: () -> GlanceAppWidget,
+    )
+
+    private val providers =
+        listOf(
+            Provider(MBTATripWidgetReceiver::class.java) { MBTATripWidget() },
+            Provider(MBTAStationBoardWidgetReceiver::class.java) { MBTAStationBoardWidget() },
+            Provider(MBTAFavoritesWidgetReceiver::class.java) { MBTAFavoritesWidget() },
+            Provider(MBTAAlertsWidgetReceiver::class.java) { MBTAAlertsWidget() },
+        )
+
     override suspend fun doWork(): Result {
         val requestedIds = inputData.getIntArray(KEY_APP_WIDGET_IDS)
         val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
 
-        val tripComponent = ComponentName(applicationContext, MBTATripWidgetReceiver::class.java)
-        val stationComponent = ComponentName(applicationContext, MBTAStationBoardWidgetReceiver::class.java)
-
-        val tripReceiverName = MBTATripWidgetReceiver::class.java.name
-        val stationReceiverName = MBTAStationBoardWidgetReceiver::class.java.name
-
-        val tripOnlyIds = mutableListOf<Int>()
-        val stationOnlyIds = mutableListOf<Int>()
+        val idsByProvider = providers.associateWith { mutableListOf<Int>() }
         val ambiguousIds = mutableListOf<Int>()
 
         if (requestedIds != null) {
             for (id in requestedIds) {
-                when (appWidgetManager.getAppWidgetInfo(id)?.provider?.className) {
-                    tripReceiverName -> tripOnlyIds.add(id)
-                    stationReceiverName -> stationOnlyIds.add(id)
-                    else -> ambiguousIds.add(id)
-                }
+                val className = appWidgetManager.getAppWidgetInfo(id)?.provider?.className
+                val provider = providers.firstOrNull { it.receiver.name == className }
+                if (provider != null) idsByProvider.getValue(provider).add(id) else ambiguousIds.add(id)
             }
         } else {
-            tripOnlyIds.addAll(appWidgetManager.getAppWidgetIds(tripComponent).toList())
-            stationOnlyIds.addAll(appWidgetManager.getAppWidgetIds(stationComponent).toList())
+            for (provider in providers) {
+                val component = ComponentName(applicationContext, provider.receiver)
+                idsByProvider.getValue(provider).addAll(appWidgetManager.getAppWidgetIds(component).toList())
+            }
         }
 
-        if (tripOnlyIds.isEmpty() && stationOnlyIds.isEmpty() && ambiguousIds.isEmpty()) {
+        if (idsByProvider.values.all { it.isEmpty() } && ambiguousIds.isEmpty()) {
             return Result.success()
         }
 
-        if (tripOnlyIds.isNotEmpty()) {
+        for ((provider, ids) in idsByProvider) {
+            if (ids.isEmpty()) continue
             val updateIntent =
-                Intent(applicationContext, MBTATripWidgetReceiver::class.java).apply {
+                Intent(applicationContext, provider.receiver).apply {
                     action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, tripOnlyIds.toIntArray())
-                }
-            applicationContext.sendBroadcast(updateIntent)
-        }
-
-        if (stationOnlyIds.isNotEmpty()) {
-            val updateIntent =
-                Intent(applicationContext, MBTAStationBoardWidgetReceiver::class.java).apply {
-                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, stationOnlyIds.toIntArray())
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids.toIntArray())
                 }
             applicationContext.sendBroadcast(updateIntent)
         }
 
         val glanceAppWidgetManager = GlanceAppWidgetManager(applicationContext)
 
-        for (appWidgetId in tripOnlyIds) {
-            updateWithRetry(glanceAppWidgetManager, MBTATripWidget(), appWidgetId)
+        for ((provider, ids) in idsByProvider) {
+            for (appWidgetId in ids) {
+                updateWithRetry(glanceAppWidgetManager, provider.newWidget(), appWidgetId)
+            }
         }
-        for (appWidgetId in stationOnlyIds) {
-            updateWithRetry(glanceAppWidgetManager, MBTAStationBoardWidget(), appWidgetId)
-        }
+        // Provider info was unavailable (registry lag on some launchers): try every widget type.
+        // tryUpdateGlanceWidget only matches ids registered to the widget's own provider class, so
+        // at most one type actually composes.
         for (appWidgetId in ambiguousIds) {
-            updateWithRetry(glanceAppWidgetManager, MBTATripWidget(), appWidgetId)
-            updateWithRetry(glanceAppWidgetManager, MBTAStationBoardWidget(), appWidgetId)
+            updateAmbiguousWithRetry(glanceAppWidgetManager, appWidgetId)
         }
 
         return Result.success()
+    }
+
+    private suspend fun updateAmbiguousWithRetry(
+        glanceManager: GlanceAppWidgetManager,
+        appWidgetId: Int,
+    ) {
+        repeat(MAX_RETRIES) { attempt ->
+            for (provider in providers) {
+                if (tryUpdateGlanceWidget(applicationContext, glanceManager, appWidgetId, provider.newWidget())) {
+                    return
+                }
+            }
+            if (attempt < MAX_RETRIES - 1) delay(RETRY_DELAY_MS)
+        }
     }
 
     private suspend fun updateWithRetry(
@@ -198,8 +207,9 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
         internal const val RETRY_DELAY_MS = 450L
 
         /**
-         * Refreshes all home screen widgets (trip and station board). Pass specific IDs after
-         * configuration, or null to update every placed instance (e.g. when returning to the home screen).
+         * Refreshes home screen widgets (trip, station board, favorites, alerts). Pass specific IDs
+         * after configuration, or null to update every placed instance (e.g. when returning to the
+         * home screen).
          */
         public fun enqueueRefresh(context: Context, appWidgetIds: IntArray? = null) {
             val builder = OneTimeWorkRequestBuilder<WidgetUpdateWorker>()
