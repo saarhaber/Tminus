@@ -46,52 +46,55 @@ public class WidgetStationBoardUseCase internal constructor(
         )
     }
 
-    /**
-     * The next [limit] departures, one row per trip (a trip calling at several platforms of the same
-     * station must not appear twice), ordered by departure time.
-     */
-    private fun buildDepartures(
-        scheduleResponse: ScheduleResponse,
-        globalData: GlobalData,
-        configuredStopId: String,
-        routeFilter: String?,
-        now: EasternTimeInstant,
-        limit: Int,
-    ): List<WidgetStationBoardDeparture> {
-        val stops = globalData.stops
-        val earliestPerTrip = LinkedHashMap<String, Pair<com.saarlabs.tminus.model.Schedule, EasternTimeInstant>>()
+}
 
-        for (schedule in scheduleResponse.schedules) {
-            if (!Stop.equalOrFamily(schedule.stopId, configuredStopId, stops)) continue
-            val departure = schedule.departureTime ?: schedule.arrivalTime ?: continue
-            if (departure < now) continue
-            val trip = scheduleResponse.trips[schedule.tripId] ?: continue
-            if (routeFilter != null && trip.routeId != routeFilter) continue
+/**
+ * The next [limit] departures at [configuredStopId], one row per trip (a trip calling at several
+ * platforms of the same station must not appear twice), ordered by departure time.
+ *
+ * Split out from the use case so it can be tested without a network round trip.
+ */
+internal fun buildDepartures(
+    scheduleResponse: ScheduleResponse,
+    globalData: GlobalData,
+    configuredStopId: String,
+    routeFilter: String?,
+    now: EasternTimeInstant,
+    limit: Int,
+): List<WidgetStationBoardDeparture> {
+    val stops = globalData.stops
+    val earliestPerTrip = LinkedHashMap<String, Pair<com.saarlabs.tminus.model.Schedule, EasternTimeInstant>>()
 
-            val existing = earliestPerTrip[schedule.tripId]
-            if (existing == null || departure < existing.second) {
-                earliestPerTrip[schedule.tripId] = schedule to departure
-            }
+    for (schedule in scheduleResponse.schedules) {
+        if (!Stop.equalOrFamily(schedule.stopId, configuredStopId, stops)) continue
+        val departure = schedule.departureTime ?: schedule.arrivalTime ?: continue
+        if (departure < now) continue
+        val trip = scheduleResponse.trips[schedule.tripId] ?: continue
+        if (routeFilter != null && trip.routeId != routeFilter) continue
+
+        val existing = earliestPerTrip[schedule.tripId]
+        if (existing == null || departure < existing.second) {
+            earliestPerTrip[schedule.tripId] = schedule to departure
         }
-
-        val fallbackStop = globalData.getStop(configuredStopId)?.resolveParent(stops)
-
-        return earliestPerTrip.values
-            .sortedBy { it.second }
-            .asSequence()
-            .mapNotNull { (schedule, departure) ->
-                val trip = scheduleResponse.trips[schedule.tripId] ?: return@mapNotNull null
-                val route = globalData.getRoute(trip.routeId) ?: return@mapNotNull null
-                val scheduleStop = stops[schedule.stopId] ?: fallbackStop
-                WidgetStationBoardDeparture(
-                    route = route,
-                    headsign = schedule.stopHeadsign?.takeIf { it.isNotBlank() } ?: trip.headsign,
-                    departureTime = departure,
-                    minutesUntil = (departure - now).inWholeMinutes.toInt().coerceAtLeast(0),
-                    platform = scheduleStop?.commuterRailPlatform(),
-                )
-            }
-            .take(limit)
-            .toList()
     }
+
+    val fallbackStop = globalData.getStop(configuredStopId)?.resolveParent(stops)
+
+    return earliestPerTrip.values
+        .sortedBy { it.second }
+        .asSequence()
+        .mapNotNull { (schedule, departure) ->
+            val trip = scheduleResponse.trips[schedule.tripId] ?: return@mapNotNull null
+            val route = globalData.getRoute(trip.routeId) ?: return@mapNotNull null
+            val scheduleStop = stops[schedule.stopId] ?: fallbackStop
+            WidgetStationBoardDeparture(
+                route = route,
+                headsign = schedule.stopHeadsign?.takeIf { it.isNotBlank() } ?: trip.headsign,
+                departureTime = departure,
+                minutesUntil = (departure - now).inWholeMinutes.toInt().coerceAtLeast(0),
+                platform = scheduleStop?.commuterRailPlatform(),
+            )
+        }
+        .take(limit)
+        .toList()
 }

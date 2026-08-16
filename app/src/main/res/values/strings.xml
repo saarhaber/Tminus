@@ -220,6 +220,20 @@
     <string name="mode_ferry">Ferry</string>
     <string name="mode_bus">Bus</string>
 
+    <string name="last_train_after_midnight">Window ends after midnight</string>
+    <string name="last_train_after_midnight_help">The real last train usually leaves after midnight. Turn this on so the end time means early tomorrow morning.</string>
+
+    <string name="settings_key_show">Show API key</string>
+    <string name="settings_key_hide">Hide API key</string>
+    <string name="settings_dynamic_color_title">Match my wallpaper</string>
+    <string name="settings_dynamic_color_body">Use Android\'s Material You colours taken from your wallpaper.</string>
+
+    <string name="notif_rationale_title">Turn on alerts?</string>
+    <string name="notif_rationale_body">tMinus needs notification permission to tell you when it is time to leave, when your train is due, and when an elevator at your station goes out.</string>
+    <string name="notif_rationale_detail">Alerts only fire for the routes, times and stations you set up. You can change this any time in Android settings.</string>
+    <string name="notif_rationale_allow">Turn on alerts</string>
+    <string name="notif_rationale_not_now">Not now</string>
+
     <!-- Notification channels -->
     <string name="notif_channel_last_train">Last / first train</string>
     <string name="notif_channel_accessibility">Elevator &amp; station alerts</string>

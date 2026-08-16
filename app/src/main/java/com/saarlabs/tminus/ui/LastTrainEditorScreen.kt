@@ -71,7 +71,7 @@ public fun LastTrainEditorScreen(
     var stop by remember { mutableStateOf<Stop?>(null) }
     var notifyMin by remember { mutableStateOf((initial?.notifyMinutesBefore ?: 45).toString()) }
     var winStart by remember { mutableStateOf(initial?.windowStartMinutes ?: 18 * 60) }
-    var winEnd by remember { mutableStateOf(initial?.windowEndMinutes ?: 23 * 60 + 59) }
+    var winEnd by remember { mutableStateOf(initial?.windowEndMinutes ?: 26 * 60) }
     var firstStart by remember { mutableStateOf(initial?.firstWindowStartMinutes ?: 4 * 60) }
     var firstEnd by remember { mutableStateOf(initial?.firstWindowEndMinutes ?: 10 * 60) }
     val use24Hour = rememberUse24HourTime()
@@ -80,6 +80,7 @@ public fun LastTrainEditorScreen(
     }
     var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
     var showStopDialog by remember { mutableStateOf(false) }
+    val routeScopedStops = rememberStopsForRoute(routeId)
     var globalData by remember { mutableStateOf<GlobalData?>(null) }
     var routeMenuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -230,13 +231,45 @@ public fun LastTrainEditorScreen(
                     use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                val endsAfterMidnight = winEnd >= MINUTES_PER_DAY
                 MinutesFromMidnightPickerField(
-                    minutesFromMidnight = winEnd,
-                    onMinutesChange = { winEnd = it },
+                    minutesFromMidnight = winEnd % MINUTES_PER_DAY,
+                    onMinutesChange = {
+                        winEnd = if (endsAfterMidnight) it + MINUTES_PER_DAY else it
+                    },
                     label = stringResource(R.string.last_train_window_end_min),
                     use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = endsAfterMidnight,
+                                onValueChange = { after ->
+                                    winEnd =
+                                        if (after) {
+                                            (winEnd % MINUTES_PER_DAY) + MINUTES_PER_DAY
+                                        } else {
+                                            winEnd % MINUTES_PER_DAY
+                                        }
+                                },
+                                role = Role.Switch,
+                            )
+                            .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(stringResource(R.string.last_train_after_midnight))
+                        Text(
+                            text = stringResource(R.string.last_train_after_midnight_help),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = endsAfterMidnight, onCheckedChange = null)
+                }
             }
             LastTrainMode.FIRST -> {
                 MinutesFromMidnightPickerField(
@@ -288,11 +321,13 @@ public fun LastTrainEditorScreen(
         Button(
             onClick = {
                 val s = stop ?: return@Button
-                val ws = winStart.coerceIn(0, 24 * 60 - 1)
-                var we = winEnd.coerceIn(0, 24 * 60 - 1)
+                val ws = winStart.coerceIn(0, MINUTES_PER_DAY - 1)
+                // Not clamped to one day: service-day minutes above 1440 express after-midnight
+                // service, which is exactly what a "last train" window needs.
+                var we = winEnd.coerceIn(0, SERVICE_DAY_MAX_MINUTES)
                 if (we <= ws) we = (ws + 1).coerceAtMost(24 * 60 - 1)
-                val fs = firstStart.coerceIn(0, 24 * 60 - 1)
-                var fe = firstEnd.coerceIn(0, 24 * 60 - 1)
+                val fs = firstStart.coerceIn(0, MINUTES_PER_DAY - 1)
+                var fe = firstEnd.coerceIn(0, MINUTES_PER_DAY - 1)
                 if (fe <= fs) fe = (fs + 1).coerceAtMost(24 * 60 - 1)
                 val profile =
                     LastTrainProfile(
@@ -339,6 +374,8 @@ public fun LastTrainEditorScreen(
                         Text(stringResource(R.string.commute_cancel))
                     }
                     StopSearchPicker(
+                        restrictToStops = routeScopedStops,
+                        restrictionActive = true,
                         onStopChosen = {
                             stop = it
                             showStopDialog = false
@@ -349,3 +386,9 @@ public fun LastTrainEditorScreen(
         }
     }
 }
+
+/** Minutes in a calendar day. */
+private const val MINUTES_PER_DAY = 24 * 60
+
+/** Latest minute an MBTA service day reaches (26:59). */
+private const val SERVICE_DAY_MAX_MINUTES = 27 * 60 - 1

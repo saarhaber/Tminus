@@ -217,6 +217,7 @@ public class TminusNotificationWorker(
                             p.stopId,
                             minutesToHHmm(p.windowStartMinutes),
                             minutesToHHmm(p.windowEndMinutes),
+                            serviceDate = nowEt.serviceDate,
                         )
                     LastTrainMode.FIRST ->
                         graph.client.fetchFirstDepartureInWindow(
@@ -225,6 +226,7 @@ public class TminusNotificationWorker(
                             p.stopId,
                             minutesToHHmm(p.firstWindowStartMinutes),
                             minutesToHHmm(p.firstWindowEndMinutes),
+                            serviceDate = nowEt.serviceDate,
                         )
                 }
 

@@ -38,6 +38,20 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all { it.testLogging { events("passed", "skipped", "failed") } }
+        }
+    }
+
+    lint {
+        warningsAsErrors = false
+        abortOnError = true
+        checkDependencies = true
+        sarifReport = true
+    }
 }
 
 kotlin {
@@ -68,4 +82,7 @@ dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.compose.reorderable)
     implementation(project(":network-json"))
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

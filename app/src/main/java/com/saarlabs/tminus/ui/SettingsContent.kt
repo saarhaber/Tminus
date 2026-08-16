@@ -1,6 +1,7 @@
 package com.saarlabs.tminus.ui
 
 import android.content.Context
+import android.os.Build
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
@@ -31,18 +33,21 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,12 +61,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.SettingsKeys
 import com.saarlabs.tminus.android.widget.WidgetUpdateWorker
@@ -99,6 +108,8 @@ public fun SettingsContent(
             SettingsKeys.THEME_DARK -> 2
             else -> 0
         }
+    val settings = remember(context) { AppGraph.from(context).settings }
+    var dynamicColor by remember { mutableStateOf(settings.dynamicColorEnabled()) }
     var fontPercent by remember {
         mutableIntStateOf(
             prefs.getInt(
@@ -112,16 +123,14 @@ public fun SettingsContent(
     val formatDirty = use24Hour != initialUse24Hour
 
     val scroll = rememberScrollState()
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-    ) { innerPadding ->
+    // No Scaffold here: this composable is hosted inside the app's Scaffold, and nesting a second
+    // one applied the window insets twice — which is what left a band of dead space above the title.
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .verticalScroll(scroll)
-                    .padding(innerPadding)
                     .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
             Text(
@@ -184,6 +193,38 @@ public fun SettingsContent(
                             contentDescription =
                                 stringResource(R.string.settings_theme_dark_cd),
                         )
+                    }
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .toggleable(
+                                    value = dynamicColor,
+                                    onValueChange = {
+                                        dynamicColor = it
+                                        settings.setDynamicColorEnabled(it)
+                                    },
+                                    role = Role.Switch,
+                                )
+                                .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(
+                                text = stringResource(R.string.settings_dynamic_color_title),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_dynamic_color_body),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = dynamicColor, onCheckedChange = null)
                     }
                 }
             }
@@ -316,10 +357,28 @@ public fun SettingsContent(
                     url = "https://api-v3.mbta.com/docs/swagger/index.html",
                 )
                 Spacer(Modifier.height(14.dp))
+                var keyVisible by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = v3,
                     onValueChange = { v3 = it },
                     label = { Text(stringResource(R.string.settings_v3_key_label)) },
+                    // Masked by default: an API key is a credential, and Settings is a screen people
+                    // open in public.
+                    visualTransformation =
+                        if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { keyVisible = !keyVisible }) {
+                            Icon(
+                                imageVector =
+                                    if (keyVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription =
+                                    stringResource(
+                                        if (keyVisible) R.string.settings_key_hide
+                                        else R.string.settings_key_show,
+                                    ),
+                            )
+                        }
+                    },
                     supportingText = {
                         Text(
                             text =
@@ -396,6 +455,10 @@ public fun SettingsContent(
 
             Spacer(Modifier.height(24.dp))
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 

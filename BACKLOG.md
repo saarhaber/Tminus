@@ -13,6 +13,18 @@ Status legend: `[ ]` open · `[x]` done
 
 ## P0 — Critical
 
+### [x] 0. Release builds fail: `ic_brand_logo.png` is a JPEG
+`app/src/main/res/drawable-nodpi/ic_brand_logo.png` is JPEG data with a `.png` extension. Debug
+builds tolerate it because PNG crunching is off; `assembleRelease` fails at `mergeReleaseResources`
+with "file failed to compile". The project cannot currently produce a release APK, and the file is
+also the launcher icon foreground.
+
+**Evidence:** `file ic_brand_logo.png` → `JPEG image data … 1024x1024`; `./gradlew assembleRelease`
+→ `ERROR: … ic_brand_logo.png: AAPT: error: file failed to compile.`
+
+**Found while** adding a release-build check to CI, not in the emulator pass.
+
+
 ### [x] 1. Remove `AgentDebugLog` — debug telemetry ships in the release APK
 `app/.../android/widget/AgentDebugLog.kt` POSTs a JSON payload (app-widget ids, prefs keys, commit
 results) to a hardcoded HTTP endpoint (`http://10.0.2.2:7603`, `http://127.0.0.1:7603`) on every

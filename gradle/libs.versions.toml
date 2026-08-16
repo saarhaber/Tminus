@@ -4,7 +4,7 @@ kotlin = "2.3.20"
 junit = "4.13.2"
 compileSdk = "36"
 minSdk = "26"
-targetSdk = "35"
+targetSdk = "36"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version = "1.18.0" }
@@ -28,6 +28,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version = "0.7.1" }
 compose-reorderable = { module = "org.burnoutcrew.composereorderable:reorderable", version = "0.9.6" }
 junit = { module = "junit:junit", version.ref = "junit" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.10.2" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

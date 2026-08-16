@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The MBTA API key is a credential and must not leave the device in a cloud backup. The cached stop
+  catalogue is excluded too: it is ~1.7 MB of data that is cheaper to refetch than to back up.
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="tminus_settings.xml" />
+    <exclude domain="file" path="global_data_cache.json" />
+</full-backup-content>

@@ -63,6 +63,7 @@ public fun AccessibilityEditorScreen(
     var stop by remember { mutableStateOf<Stop?>(null) }
     var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
     var showStopDialog by remember { mutableStateOf(false) }
+    val routeScopedStops = rememberStopsForRoute(routeId)
     var globalData by remember { mutableStateOf<GlobalData?>(null) }
     var routeMenuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -229,6 +230,8 @@ public fun AccessibilityEditorScreen(
                         Text(stringResource(R.string.commute_cancel))
                     }
                     StopSearchPicker(
+                        restrictToStops = routeScopedStops,
+                        restrictionActive = true,
                         onStopChosen = {
                             stop = it
                             showStopDialog = false

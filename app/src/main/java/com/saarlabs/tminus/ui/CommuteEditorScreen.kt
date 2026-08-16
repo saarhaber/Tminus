@@ -114,6 +114,7 @@ public fun CommuteEditorScreen(
 
     var previewText by remember { mutableStateOf<String?>(null) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
+    var nameTouchedInvalid by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val graph = remember(context) { AppGraph.from(context) }
@@ -165,10 +166,24 @@ public fun CommuteEditorScreen(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+        val nameInvalid = nameTouchedInvalid && name.isBlank()
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it },
+            onValueChange = {
+                name = it
+                // Clear the error as soon as the user acts on it, rather than leaving a stale
+                // "add a name" message under a field that now has a name in it.
+                if (it.isNotBlank()) nameTouchedInvalid = false
+                validationMessage = null
+            },
             label = { Text(stringResource(R.string.commute_name)) },
+            isError = nameInvalid,
+            supportingText =
+                if (nameInvalid) {
+                    { Text(stringResource(R.string.commute_validation_need_name)) }
+                } else {
+                    null
+                },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
@@ -187,6 +202,7 @@ public fun CommuteEditorScreen(
             selectedDays = days,
             onToggleDay = { d ->
                 days = if (days.contains(d)) days - d else days + d
+                validationMessage = null
             },
         )
 
@@ -362,10 +378,15 @@ public fun CommuteEditorScreen(
                     previewText =
                         if (trip != null) {
                             val leave = trip.departureTime.minus(lead.minutes)
+                            // Formatted, not `local.toString()`: that prints the raw ISO form and
+                            // ignores the user's 12/24-hour preference.
                             "${trip.route.label} · ${trip.headsign ?: trip.tripId}\n" +
-                                "${context.getString(R.string.commute_preview_dep)} ${trip.departureTime.local}\n" +
-                                "${context.getString(R.string.commute_preview_arr)} ${trip.arrivalTime.local}\n" +
-                                "${context.getString(R.string.commute_preview_leave)} ${leave.local}"
+                                "${context.getString(R.string.commute_preview_dep)} " +
+                                "${trip.departureTime.formatDayAndClock(use24Hour)}\n" +
+                                "${context.getString(R.string.commute_preview_arr)} " +
+                                "${trip.arrivalTime.formatClock(use24Hour)}\n" +
+                                "${context.getString(R.string.commute_preview_leave)} " +
+                                leave.formatClock(use24Hour)
                         } else {
                             context.getString(R.string.commute_preview_none)
                         }
@@ -378,12 +399,10 @@ public fun CommuteEditorScreen(
 
         RowHorizontalButtons(onCancel = onCancel, onSave = {
             validationMessage = null
+            nameTouchedInvalid = name.isBlank()
             val f = fromStop
             val t = toStop
             val issues = mutableListOf<String>()
-            if (name.isBlank()) {
-                issues.add(context.getString(R.string.commute_validation_need_name))
-            }
             if (f == null) {
                 issues.add(context.getString(R.string.commute_validation_need_from_stop))
             }
@@ -395,6 +414,8 @@ public fun CommuteEditorScreen(
             }
             if (issues.isNotEmpty()) {
                 validationMessage = issues.joinToString("\n")
+            }
+            if (issues.isNotEmpty() || nameTouchedInvalid) {
                 return@RowHorizontalButtons
             }
             val from = requireNotNull(f)
