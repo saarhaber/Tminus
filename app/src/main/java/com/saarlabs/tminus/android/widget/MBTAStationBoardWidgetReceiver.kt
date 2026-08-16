@@ -14,9 +14,9 @@ public class MBTAStationBoardWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
-        val widgetPreferences = WidgetPreferences(context.applicationContext)
+        val configStore = WidgetConfigStore(context.applicationContext)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            appWidgetIds.forEach { widgetPreferences.removeStationBoardConfig(it) }
+            appWidgetIds.forEach { configStore.removeStationBoardConfig(it) }
         }
         LiveUpdateManager.ensureRunningIfNeeded(context.applicationContext)
     }

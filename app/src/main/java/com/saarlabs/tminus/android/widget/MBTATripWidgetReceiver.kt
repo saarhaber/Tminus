@@ -14,9 +14,9 @@ public class MBTATripWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
-        val widgetPreferences = WidgetPreferences(context.applicationContext)
+        val configStore = WidgetConfigStore(context.applicationContext)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            appWidgetIds.forEach { widgetPreferences.removeConfig(it) }
+            appWidgetIds.forEach { configStore.removeTripConfig(it) }
         }
         LiveUpdateManager.ensureRunningIfNeeded(context.applicationContext)
     }

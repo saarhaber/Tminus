@@ -45,8 +45,8 @@ import kotlinx.coroutines.withContext
 
 public class AlertsWidgetConfigActivity : ComponentActivity() {
 
-    private val widgetPreferences: WidgetPreferences by lazy {
-        WidgetPreferences(applicationContext)
+    private val configStore: WidgetConfigStore by lazy {
+        WidgetConfigStore(applicationContext)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,7 +69,7 @@ public class AlertsWidgetConfigActivity : ComponentActivity() {
             TminusTheme(darkTheme = rememberUserDarkTheme()) {
                 AlertsWidgetConfigScreen(
                     appWidgetId = appWidgetId,
-                    widgetPreferences = widgetPreferences,
+                    configStore = configStore,
                     onComplete = {
                         setResult(
                             RESULT_OK,
@@ -91,11 +91,12 @@ public class AlertsWidgetConfigActivity : ComponentActivity() {
 @Composable
 private fun AlertsWidgetConfigScreen(
     appWidgetId: Int,
-    widgetPreferences: WidgetPreferences,
+    configStore: WidgetConfigStore,
     onComplete: () -> Unit,
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
+    val saveErrorMessage = stringResource(R.string.widget_save_error)
     val coroutineScope = rememberCoroutineScope()
     // Default to every line selected.
     val selectedIds = remember { mutableStateListOf<String>().apply { addAll(AlertsWidgetLines.ALL.map { it.id }) } }
@@ -158,20 +159,18 @@ private fun AlertsWidgetConfigScreen(
                     coroutineScope.launch {
                         try {
                             withContext(Dispatchers.IO) {
-                                widgetPreferences.setAlertsConfig(
+                                configStore.setAlertsConfig(
                                     appWidgetId,
                                     WidgetAlertsConfig(lineGroupIds = selectedIds.toList()),
                                 )
                             }
-                            val appContext = context.applicationContext
-                            updateAlertsWidgetWithRetry(appContext, appWidgetId)
-                            WidgetUpdateWorker.enqueueRefresh(appContext, intArrayOf(appWidgetId))
+                            WidgetUpdateWorker.enqueueRefresh(context.applicationContext)
                             onComplete()
                         } catch (e: Exception) {
                             android.util.Log.e("AlertsWidgetConfig", "save failed", e)
                             Toast.makeText(
                                     context,
-                                    context.getString(R.string.widget_save_error),
+                                    saveErrorMessage,
                                     Toast.LENGTH_LONG,
                                 )
                                 .show()

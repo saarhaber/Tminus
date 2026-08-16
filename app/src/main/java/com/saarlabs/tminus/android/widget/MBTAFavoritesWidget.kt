@@ -11,7 +11,6 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
-import android.appwidget.AppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
@@ -36,24 +35,13 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import com.saarlabs.tminus.FavoriteStopsStore
-import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
-import com.saarlabs.tminus.SettingsKeys
-import com.saarlabs.tminus.TminusApplication
 import com.saarlabs.tminus.android.util.colorFromHex
 import com.saarlabs.tminus.android.util.formattedTime
 import com.saarlabs.tminus.model.WidgetStationBoardDeparture
 import com.saarlabs.tminus.model.response.ApiResult
-import com.saarlabs.tminus.usecases.WidgetStationBoardUseCase
 import com.saarlabs.tminus.util.EasternTimeInstant
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 
 internal data class FavoriteDepartureRow(
     val stopName: String,
@@ -69,116 +57,29 @@ public class MBTAFavoritesWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Exact
 
-    private val useCase: WidgetStationBoardUseCase
-        get() = TminusApplication.widgetStationBoardUseCase
-
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        try {
-            provideGlanceInternal(context, id)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            android.util.Log.e("MBTAFavoritesWidget", "provideGlance failed", e)
-            provideContent {
-                FavoritesContent.Message(context, context.getString(R.string.widget_unable_to_load))
+        val appWidgetId =
+            runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }
+                .getOrDefault(INVALID_WIDGET_ID)
+
+        // Loaded inside provideContent for the same reason as the other widgets: update() only
+        // recomposes already-registered content, so a configuration read before this point would
+        // stay stale for the life of the Glance session.
+        provideContent {
+            val prefs = rememberDisplayPrefs(context)
+            when (val state = rememberFavoritesState(context, appWidgetId)) {
+                FavoritesUiState.Loading ->
+                    FavoritesContent.Message(context, context.getString(R.string.loading))
+                FavoritesUiState.NoFavourites ->
+                    FavoritesContent.Message(context, context.getString(R.string.widget_favorites_empty))
+                FavoritesUiState.Failed ->
+                    FavoritesContent.Message(context, context.getString(R.string.widget_favorites_error))
+                is FavoritesUiState.Ready ->
+                    FavoritesContent.Board(context, state.rows, prefs.use24Hour)
             }
         }
     }
 
-    private suspend fun provideGlanceInternal(context: Context, id: GlanceId) {
-        GlobalDataStore.awaitClientReady()
-        val use24Hour =
-            withContext(Dispatchers.IO) {
-                context.applicationContext
-                    .getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
-                    .getBoolean(SettingsKeys.KEY_USE_24_HOUR, false)
-            }
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val config =
-            if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-                null
-            } else {
-                withContext(Dispatchers.IO) {
-                    WidgetPreferences(context.applicationContext).getFavoritesConfigOnce(appWidgetId)
-                }
-            }
-        val count = (config?.count ?: DEFAULT_FAVORITES).coerceIn(1, MAX_FAVORITES)
-        val sortBySoonest = config?.sortBySoonest ?: false
-        val favoriteIds =
-            withContext(Dispatchers.IO) {
-                FavoriteStopsStore(context.applicationContext).getIds().toList()
-            }.take(count)
-
-        if (favoriteIds.isEmpty()) {
-            provideContent {
-                FavoritesContent.Message(context, context.getString(R.string.widget_favorites_empty))
-            }
-            return
-        }
-
-        val globalData =
-            when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
-                is ApiResult.Ok -> r.data
-                is ApiResult.Error ->
-                    when (val retry = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad(forceRefresh = true) }) {
-                        is ApiResult.Ok -> retry.data
-                        is ApiResult.Error -> {
-                            provideContent {
-                                FavoritesContent.Message(context, context.getString(R.string.widget_favorites_error))
-                            }
-                            return
-                        }
-                    }
-            }
-
-        // One schedules request per favorite; fetch them concurrently so the widget renders in
-        // roughly one round-trip instead of N.
-        val rows =
-            withContext(Dispatchers.IO) {
-                coroutineScope {
-                    favoriteIds
-                        .mapNotNull { favId -> globalData.getStop(favId)?.let { favId to it } }
-                        .map { (favId, stop) ->
-                            async {
-                                val name = stop.resolveParent(globalData.stops).name
-                                val departure =
-                                    when (
-                                        val res =
-                                            useCase.getDepartures(
-                                                globalData = globalData,
-                                                stopId = favId,
-                                                routeFilter = null,
-                                                destinationFilter = null,
-                                                now = EasternTimeInstant.now(),
-                                                limit = 1,
-                                            )
-                                    ) {
-                                        is ApiResult.Ok -> res.data.departures.firstOrNull()
-                                        is ApiResult.Error -> null
-                                    }
-                                FavoriteDepartureRow(stopName = name, departure = departure)
-                            }
-                        }
-                        .awaitAll()
-                }
-            }
-
-        // Soonest first puts stops with an upcoming departure at the top (by minutes), then the
-        // stops with no departure; otherwise keep the user's favorites order.
-        val orderedRows =
-            if (sortBySoonest) {
-                rows.sortedBy { it.departure?.minutesUntil ?: Int.MAX_VALUE }
-            } else {
-                rows
-            }
-
-        provideContent { FavoritesContent.Board(context, orderedRows, use24Hour) }
-    }
-
-    private companion object {
-        const val MAX_FAVORITES = 8
-        const val DEFAULT_FAVORITES = 5
-    }
 }
 
 private object FavoritesContent {

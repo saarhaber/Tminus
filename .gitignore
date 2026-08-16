@@ -10,3 +10,6 @@
 *.iml
 .idea/
 .DS_Store
+
+# Agent worktrees and local agent settings
+/.claude/

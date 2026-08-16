@@ -6,7 +6,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import android.appwidget.AppWidgetManager
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -33,15 +32,10 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
-import com.saarlabs.tminus.TminusApplication
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.MbtaAlertSummary
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * Config-free widget listing active service alerts across the rapid-transit (subway) lines. Reuses
@@ -53,51 +47,23 @@ public class MBTAAlertsWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        try {
-            provideGlanceInternal(context, id)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            android.util.Log.e("MBTAAlertsWidget", "provideGlance failed", e)
-            provideContent {
-                AlertsContent.Board(context, error = true, alerts = emptyList())
-            }
+        val appWidgetId =
+            runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }
+                .getOrDefault(INVALID_WIDGET_ID)
+
+        // Loaded inside provideContent for the same reason as the other widgets: update() only
+        // recomposes already-registered content, so a configuration read before this point would
+        // stay stale for the life of the Glance session.
+        provideContent {
+            val state = rememberAlertsState(context, appWidgetId)
+            AlertsContent.Board(
+                context = context,
+                error = state.failed,
+                alerts = state.alerts,
+            )
         }
     }
 
-    private suspend fun provideGlanceInternal(context: Context, id: GlanceId) {
-        GlobalDataStore.awaitClientReady()
-        if (!GlobalDataStore.isClientReady()) {
-            provideContent { AlertsContent.Board(context, error = true, alerts = emptyList()) }
-            return
-        }
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val config =
-            if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-                null
-            } else {
-                withContext(Dispatchers.IO) {
-                    WidgetPreferences(context.applicationContext).getAlertsConfigOnce(appWidgetId)
-                }
-            }
-        val routeFilter = AlertsWidgetLines.filterFor(config?.lineGroupIds ?: emptyList())
-        val result =
-            withContext(Dispatchers.IO) {
-                GlobalDataStore.client.fetchAlertsForRoute(routeFilter)
-            }
-        when (result) {
-            is ApiResult.Error ->
-                provideContent { AlertsContent.Board(context, error = true, alerts = emptyList()) }
-            is ApiResult.Ok -> {
-                val alerts = result.data.distinctBy { it.id }.take(MAX_ALERTS)
-                provideContent { AlertsContent.Board(context, error = false, alerts = alerts) }
-            }
-        }
-    }
-
-    private companion object {
-        const val MAX_ALERTS = 8
-    }
 }
 
 private object AlertsContent {

@@ -49,8 +49,8 @@ import kotlinx.coroutines.withContext
 
 public class FavoritesWidgetConfigActivity : ComponentActivity() {
 
-    private val widgetPreferences: WidgetPreferences by lazy {
-        WidgetPreferences(applicationContext)
+    private val configStore: WidgetConfigStore by lazy {
+        WidgetConfigStore(applicationContext)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,7 +73,7 @@ public class FavoritesWidgetConfigActivity : ComponentActivity() {
             TminusTheme(darkTheme = rememberUserDarkTheme()) {
                 FavoritesWidgetConfigScreen(
                     appWidgetId = appWidgetId,
-                    widgetPreferences = widgetPreferences,
+                    configStore = configStore,
                     onComplete = {
                         setResult(
                             RESULT_OK,
@@ -95,11 +95,12 @@ public class FavoritesWidgetConfigActivity : ComponentActivity() {
 @Composable
 private fun FavoritesWidgetConfigScreen(
     appWidgetId: Int,
-    widgetPreferences: WidgetPreferences,
+    configStore: WidgetConfigStore,
     onComplete: () -> Unit,
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
+    val saveErrorMessage = stringResource(R.string.widget_save_error)
     val coroutineScope = rememberCoroutineScope()
     var count by remember { mutableIntStateOf(5) }
     var sortBySoonest by remember { mutableStateOf(false) }
@@ -158,20 +159,18 @@ private fun FavoritesWidgetConfigScreen(
                     coroutineScope.launch {
                         try {
                             withContext(Dispatchers.IO) {
-                                widgetPreferences.setFavoritesConfig(
+                                configStore.setFavoritesConfig(
                                     appWidgetId,
                                     WidgetFavoritesConfig(count = count, sortBySoonest = sortBySoonest),
                                 )
                             }
-                            val appContext = context.applicationContext
-                            updateFavoritesWidgetWithRetry(appContext, appWidgetId)
-                            WidgetUpdateWorker.enqueueRefresh(appContext, intArrayOf(appWidgetId))
+                            WidgetUpdateWorker.enqueueRefresh(context.applicationContext)
                             onComplete()
                         } catch (e: Exception) {
                             android.util.Log.e("FavoritesWidgetConfig", "save failed", e)
                             Toast.makeText(
                                     context,
-                                    context.getString(R.string.widget_save_error),
+                                    saveErrorMessage,
                                     Toast.LENGTH_LONG,
                                 )
                                 .show()

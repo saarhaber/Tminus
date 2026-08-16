@@ -10,6 +10,9 @@ internal object SettingsKeys {
     const val THEME_SYSTEM = "system"
     const val THEME_LIGHT = "light"
     const val THEME_DARK = "dark"
+
+    /** When true (default) and the platform supports it, the theme follows the device wallpaper. */
+    const val KEY_DYNAMIC_COLOR = "dynamic_color"
     /** Parent stop ids the user starred; used to pin stations to the top of stop lists. */
     const val KEY_FAVORITE_STOP_IDS = "favorite_stop_ids"
     /**

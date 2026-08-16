@@ -18,3 +18,4 @@ rootProject.name = "tMinus"
 
 include(":app")
 include(":network-json")
+include(":baselineprofile")

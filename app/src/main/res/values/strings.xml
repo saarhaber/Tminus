@@ -24,7 +24,8 @@
     <string name="commute_list_title">Commutes</string>
     <string name="commute_back">Back</string>
     <string name="commute_add">Add commute</string>
-    <string name="commute_list_empty">No commutes yet. Tap + to add your route, days, and times. You can save several (morning, evening, weekend, etc.).</string>
+    <string name="commute_list_empty">No commutes yet</string>
+    <string name="commute_list_empty_hint">Add a route, the days you travel and a target time, and tMinus will tell you when to leave. Save as many as you like — morning, evening, weekends.</string>
     <string name="commute_list_summary">Target ~%1$s · notify %2$d min before departure</string>
     <string name="commute_editor_title">Commute</string>
     <string name="commute_name">Name (e.g. Morning inbound)</string>
@@ -96,7 +97,8 @@
 
     <string name="last_train_list_title">Last / first train</string>
     <string name="last_train_add">Add alert</string>
-    <string name="last_train_list_empty">No alerts yet. Add one for the last train home or the first train of the morning—notifications use scheduled times from the MBTA API.</string>
+    <string name="last_train_list_empty">No train alerts yet</string>
+    <string name="last_train_list_empty_hint">Get a heads-up before the last train home, or the first one of the morning, at a station you choose.</string>
     <string name="last_train_list_reorder_hint">Long-press a card to reorder. Swipe left to delete.</string>
     <string name="last_train_list_delete">Remove alert</string>
     <string name="last_train_list_timing_summary">Window %1$s · notify %2$d min before</string>
@@ -118,7 +120,8 @@
 
     <string name="access_list_title">Accessibility alerts</string>
     <string name="access_add">Add watch</string>
-    <string name="access_list_empty">Watch a route and station: when MBTA posts elevator or escalator alerts whose text matches that station, you get notified.</string>
+    <string name="access_list_empty">No station watches yet</string>
+    <string name="access_list_empty_hint">Watch a station and tMinus will tell you when the MBTA reports an elevator or escalator outage there.</string>
     <string name="access_list_reorder_hint">Long-press a card to reorder. Swipe left to delete.</string>
     <string name="access_list_delete">Remove watch</string>
     <string name="access_editor_title">Accessibility watch</string>
@@ -233,6 +236,56 @@
     <string name="widget_station_board_route_all">All lines</string>
     <string name="widget_station_board_loading_routes">Loading lines…</string>
     <string name="widget_station_board_save">Add widget</string>
+
+    <!-- Stop picker -->
+    <string name="stop_search_empty">No stops available yet. Check your connection and try again.</string>
+    <string name="stop_search_no_results">No stops match “%1$s”.</string>
+    <string name="stop_picker_route_scoped_header">Stops on this route</string>
+    <string name="stop_picker_route_scoped_empty">No stops found for this route. Pick a different route.</string>
+    <string name="mode_subway">Subway</string>
+    <string name="mode_commuter_rail">Commuter rail</string>
+    <string name="mode_ferry">Ferry</string>
+    <string name="mode_bus">Bus</string>
+
+    <string name="last_train_after_midnight">Window ends after midnight</string>
+    <string name="last_train_after_midnight_help">The real last train usually leaves after midnight. Turn this on so the end time means early tomorrow morning.</string>
+
+    <string name="settings_key_show">Show API key</string>
+    <string name="settings_key_hide">Hide API key</string>
+    <string name="settings_dynamic_color_title">Match my wallpaper</string>
+    <string name="settings_dynamic_color_body">Use Android\'s Material You colours taken from your wallpaper.</string>
+
+    <string name="notif_rationale_title">Turn on alerts?</string>
+    <string name="notif_rationale_body">tMinus needs notification permission to tell you when it is time to leave, when your train is due, and when an elevator at your station goes out.</string>
+    <string name="notif_rationale_detail">Alerts only fire for the routes, times and stations you set up. You can change this any time in Android settings.</string>
+    <string name="notif_rationale_allow">Turn on alerts</string>
+    <string name="notif_rationale_not_now">Not now</string>
+
+    <string name="home_board_section">Your stations</string>
+    <string name="home_board_loading">Loading departures…</string>
+    <string name="home_board_no_departures">No more departures today.</string>
+
+    <string name="settings_exact_alarm_title">Per-minute widget updates are off</string>
+    <string name="settings_exact_alarm_body">Android is blocking exact alarms for tMinus, so home-screen widgets refresh about every 15 minutes instead of every minute.</string>
+    <string name="settings_exact_alarm_action">Allow exact alarms</string>
+
+    <string name="day_summary_none">No days selected</string>
+    <string name="day_summary_every_day">Every day</string>
+    <string name="day_summary_weekdays">Weekdays</string>
+    <string name="day_summary_weekends">Weekends</string>
+    <string-array name="weekday_short_labels">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+
+    <!-- Notification channels -->
+    <string name="notif_channel_last_train">Last / first train</string>
+    <string name="notif_channel_accessibility">Elevator &amp; station alerts</string>
 
     <!-- Favorites departures widget -->
     <string name="widget_favorites_label">Favorite stops</string>

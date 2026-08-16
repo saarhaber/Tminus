@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +46,7 @@ import com.saarlabs.tminus.model.Route
 import com.saarlabs.tminus.model.Stop
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
-import com.saarlabs.tminus.GlobalDataStore
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.ui.stopOneLineDisplay
 import com.saarlabs.tminus.features.AccessibilityWatch
@@ -59,22 +60,28 @@ public fun AccessibilityEditorScreen(
     onSave: (AccessibilityWatch) -> Unit,
     onCancel: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var routeId by remember { mutableStateOf(initial?.routeId ?: "Orange") }
-    var stop by remember { mutableStateOf<Stop?>(null) }
-    var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
-    var showStopDialog by remember { mutableStateOf(false) }
+    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var routeId by rememberSaveable { mutableStateOf(initial?.routeId ?: "Orange") }
+    // Stop id, not a Stop: Stop is not Parcelable, so this is what survives a rotation.
+    var stopId by rememberSaveable { mutableStateOf(initial?.stopId) }
+    var enabled by rememberSaveable { mutableStateOf(initial?.enabled ?: true) }
+    var showStopDialog by rememberSaveable { mutableStateOf(false) }
+    val routeScopedStops = rememberStopsForRoute(routeId)
     var globalData by remember { mutableStateOf<GlobalData?>(null) }
     var routeMenuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val graph = remember(context) { AppGraph.from(context) }
+
+    val stop =
+        remember(globalData, stopId) {
+            val data = globalData
+            data?.getStop(stopId)?.resolveParent(data.stops)
+        }
 
     LaunchedEffect(Unit) {
-        when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
+        when (val r = withContext(Dispatchers.IO) { graph.globalData.getOrLoad() }) {
             is ApiResult.Ok -> {
                 globalData = r.data
-                if (initial != null) {
-                    stop = r.data.getStop(initial.stopId)?.resolveParent(r.data.stops)
-                }
             }
             is ApiResult.Error -> {}
         }
@@ -229,8 +236,10 @@ public fun AccessibilityEditorScreen(
                         Text(stringResource(R.string.commute_cancel))
                     }
                     StopSearchPicker(
+                        restrictToStops = routeScopedStops,
+                        restrictionActive = true,
                         onStopChosen = {
-                            stop = it
+                            stopId = it.id
                             showStopDialog = false
                         },
                     )

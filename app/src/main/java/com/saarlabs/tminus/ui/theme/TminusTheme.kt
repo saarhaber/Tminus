@@ -1,11 +1,14 @@
 package com.saarlabs.tminus.ui.theme
 
 import android.content.Context
+import android.os.Build
 import android.content.SharedPreferences
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,10 +35,10 @@ private val LightColorScheme =
         onPrimary = Color.White,
         primaryContainer = Color(0xFFD8E5FB),
         onPrimaryContainer = Color(0xFF001A41),
-        secondary = Color(0xFF1B7F3F),
+        secondary = Color(0xFF41618F),
         onSecondary = Color.White,
-        secondaryContainer = Color(0xFFBFEFCD),
-        onSecondaryContainer = Color(0xFF00210F),
+        secondaryContainer = Color(0xFFD4E3FF),
+        onSecondaryContainer = Color(0xFF15243B),
         tertiary = Color(0xFFB8227A),
         onTertiary = Color.White,
         tertiaryContainer = Color(0xFFFFD7EA),
@@ -71,10 +74,10 @@ private val DarkColorScheme =
         onPrimary = Color(0xFF002E6A),
         primaryContainer = Color(0xFF0F4594),
         onPrimaryContainer = Color(0xFFD8E5FB),
-        secondary = Color(0xFF8DD3A6),
-        onSecondary = Color(0xFF003918),
-        secondaryContainer = Color(0xFF005427),
-        onSecondaryContainer = Color(0xFFBFEFCD),
+        secondary = Color(0xFFAAC7F5),
+        onSecondary = Color(0xFF0B2947),
+        secondaryContainer = Color(0xFF2A4570),
+        onSecondaryContainer = Color(0xFFD4E3FF),
         tertiary = Color(0xFFFFAED4),
         onTertiary = Color(0xFF5C0047),
         tertiaryContainer = Color(0xFF860261),
@@ -126,19 +129,59 @@ private fun scaledTypography(base: Typography, scale: Float): Typography =
         labelSmall = base.labelSmall.scaled(scale),
     )
 
+/**
+ * The app theme.
+ *
+ * On Android 12+ the palette follows the device wallpaper unless the user opts out in Settings;
+ * everywhere else it falls back to the hand-tuned navy scheme.
+ */
 @Composable
 public fun TminusTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
+    val context = LocalContext.current
     val fontScale = rememberUserFontScale()
+    val dynamicEnabled = rememberDynamicColorEnabled()
     val baseTypography = MaterialTheme.typography
     val scaledTypo = remember(fontScale, baseTypography) { scaledTypography(baseTypography, fontScale) }
+    val colorScheme =
+        remember(darkTheme, dynamicEnabled, context) {
+            when {
+                dynamicEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                    if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+                darkTheme -> DarkColorScheme
+                else -> LightColorScheme
+            }
+        }
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+        colorScheme = colorScheme,
         typography = scaledTypo,
         content = content,
     )
+}
+
+/** Whether the wallpaper-derived palette is enabled, with live updates from Settings. */
+@Composable
+public fun rememberDynamicColorEnabled(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+    val context = LocalContext.current
+    val prefs =
+        remember(context) {
+            context.getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
+        }
+    var enabled by remember { mutableStateOf(prefs.getBoolean(SettingsKeys.KEY_DYNAMIC_COLOR, true)) }
+    DisposableEffect(prefs) {
+        val listener =
+            SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+                if (key == null || key == SettingsKeys.KEY_DYNAMIC_COLOR) {
+                    enabled = shared.getBoolean(SettingsKeys.KEY_DYNAMIC_COLOR, true)
+                }
+            }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return enabled
 }
 
 /**

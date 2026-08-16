@@ -15,9 +15,9 @@ The in-app UI uses bottom navigation: **Home** and **Settings** (API keys, time 
 
 **Commutes** (from Home): save **multiple** named routes (from/to stops), **days of week**, a **target time**, and a **window** (minutes before/after) used to query schedules. Set **notify X minutes before departure** for a “time to leave” notification, and optionally a second ping around **scheduled arrival**. Checks run on a background schedule (about every 15 minutes) using **schedule data** from the MBTA V3 API—not live predictions. Grant **notification permission** on Android 13+ when prompted.
 
-**Last / first train** alerts: pick **route id**, **direction id** (0 or 1), **stop**, **last vs first** mode, optional **time windows** (as minutes-from-midnight), and **notify N minutes before** that scheduled departure. Uses the latest/earliest departure in the window from the schedule API.
+**Last / first train** alerts: pick a **route**, **direction**, and **stop** (only stops the route actually serves are offered), **last vs first** mode, a **time window**, and **notify N minutes before** that scheduled departure. Last-train windows can run past midnight, which is when the last train usually goes.
 
-**Elevator & station alerts**: watch a **route** + **station**; the app pulls **active alerts** for that route and notifies when an alert’s text plausibly matches your station (elevator/escalator/stop-closure effects). This is **heuristic**—not a guarantee every outage is detected.
+**Elevator & station alerts**: watch a **route** + **station**; the app asks the MBTA for active alerts affecting that station (elevator/escalator/stop-closure effects) and notifies you. Matching uses the API's own stop filter, so it reflects exactly what the MBTA has published for that stop.
 
 ## Screenshots
 
@@ -43,6 +43,19 @@ The app works without keys for light use. For higher rate limits, request a free
 
 - **V3 API (schedules, stops, routes):** [MBTA Developers — V3 API](https://www.mbta.com/developers/v3-api) and [V3 API Portal](https://api-v3.mbta.com/) — paste your key in **Settings** in the app.
 
+## Development
+
+- [Architecture notes](docs/ARCHITECTURE.md) — module layout, the widget lifecycle, service-day
+  handling, and the performance rules. Worth reading before changing widgets.
+- [Working in this repository](CLAUDE.md) — conventions and the mistakes this codebase invites.
+- [Changelog](CHANGELOG.md)
+
+```bash
+./gradlew test               # unit tests
+./gradlew :app:lintDebug     # Android Lint
+./gradlew assembleRelease    # run this before pushing resource changes
+```
+
 ## Build locally
 
 1. Install [Android Studio](https://developer.android.com/studio) or the Android SDK and set `ANDROID_HOME`.
@@ -57,11 +70,19 @@ Install `app/build/outputs/apk/debug/app-debug.apk` on your device.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report issues, submit pull requests, and set up a dev environment.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to report issues, submit pull requests, and set up a dev environment. Please also read the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Security issues should go through a [private advisory](https://github.com/saarhaber/Tminus/security/advisories/new) rather than a public issue — see [SECURITY.md](SECURITY.md).
+
+## Privacy
+
+tMinus talks to `https://api-v3.mbta.com` and nothing else. There is no account, no analytics and no
+crash reporting. Your API key, if you set one, stays on the device and is excluded from cloud backup.
 
 ## CI and installable APK
 
-GitHub Actions builds a debug APK on each push and uploads it as a workflow artifact (`tminus-debug-apk`).
+GitHub Actions runs unit tests and Android Lint, then builds debug and release APKs on each push, and
+uploads the debug APK as a workflow artifact (`tminus-debug-apk`).
 
 **Rolling build from `main`:** each merge to `main` updates the prerelease [**Latest main (debug)**](https://github.com/saarhaber/Tminus/releases/tag/latest-main) on the Releases page with a fresh `app-debug.apk` (tag `latest-main`). The release title and description include a **Built (UTC)** time so you can tell when the APK last changed—GitHub’s own “published” date for that rolling entry can stay stale.
 

@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -24,7 +25,10 @@ public fun AccessibilityEditorRoute(navController: NavController, id: String) {
     val scope = rememberCoroutineScope()
     val repo = remember { AccessibilityRepository(context.applicationContext) }
     var initial by remember { mutableStateOf<AccessibilityWatch?>(null) }
-    var ready by remember { mutableStateOf(false) }
+    // Saveable: while this is false the editor is not composed, and rememberSaveable values only
+    // restore into composables that are present during the restoration pass. Leaving it as plain
+    // `remember` meant every rotation dropped the whole form.
+    var ready by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(id) {
         initial = if (id == "new") null else repo.load().find { it.id == id }

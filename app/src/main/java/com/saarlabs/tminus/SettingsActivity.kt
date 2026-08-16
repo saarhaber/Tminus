@@ -5,10 +5,10 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import com.saarlabs.tminus.ui.TminusEdgeToEdge
 import com.saarlabs.tminus.ui.theme.TminusTheme
 import com.saarlabs.tminus.ui.theme.rememberUserDarkTheme
 import androidx.compose.ui.Modifier
@@ -20,29 +20,25 @@ public class SettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        val prefs = getSharedPreferences(SettingsKeys.PREFS, MODE_PRIVATE)
+        val settings = AppGraph.from(this).settings
         setContent {
             val darkTheme = rememberUserDarkTheme()
+            TminusEdgeToEdge(darkTheme)
             TminusTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     SettingsContent(
-                        initialV3 = prefs.getString(SettingsKeys.KEY_V3_API, "") ?: "",
-                        initialUse24Hour = prefs.getBoolean(SettingsKeys.KEY_USE_24_HOUR, false),
+                        initialV3 = settings.apiKey().orEmpty(),
+                        initialUse24Hour = settings.use24HourTime(),
                         onSave = { v3, use24Hour ->
-                            prefs.edit()
-                                .putString(SettingsKeys.KEY_V3_API, v3.ifBlank { null })
-                                .putBoolean(SettingsKeys.KEY_USE_24_HOUR, use24Hour)
-                                .commit()
-                            GlobalDataStore.invalidate()
-                            runCatching { TminusApplication.refreshNetworking() }
-                                .onFailure { Log.e("SettingsActivity", "refreshNetworking failed", it) }
+                            settings.setApiKey(v3)
+                            settings.setUse24HourTime(use24Hour)
                             runCatching {
-                                WidgetUpdateWorker.enqueueRefresh(this@SettingsActivity, appWidgetIds = null)
-                            }.onFailure { Log.e("SettingsActivity", "enqueueRefresh failed", it) }
+                                AppGraph.from(this@SettingsActivity).onApiKeyChanged()
+                                WidgetUpdateWorker.enqueueRefresh(this@SettingsActivity)
+                            }.onFailure { Log.e("SettingsActivity", "applying settings failed", it) }
                             Toast.makeText(
                                 this@SettingsActivity,
                                 getString(R.string.settings_saved_snackbar),

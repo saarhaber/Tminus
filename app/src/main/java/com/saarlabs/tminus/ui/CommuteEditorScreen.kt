@@ -31,6 +31,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,7 +46,7 @@ import com.saarlabs.tminus.model.Stop
 import com.saarlabs.tminus.model.WidgetTripData
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.util.EasternTimeInstant
-import com.saarlabs.tminus.GlobalDataStore
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.commute.CommuteProfile
 import com.saarlabs.tminus.commute.CommuteTripPlanner
@@ -94,44 +96,59 @@ public fun CommuteEditorScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var days by remember {
+    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var days by rememberSaveable(stateSaver = daysSaver) {
         mutableStateOf((initial?.daysOfWeek ?: listOf(1, 2, 3, 4, 5)).toSet())
     }
-    var commuteTargetMinutes by remember {
+    var commuteTargetMinutes by rememberSaveable {
         mutableStateOf(initial?.targetMinutesFromMidnight ?: 8 * 60 + 30)
     }
     val use24Hour = rememberUse24HourTime()
-    var winBefore by remember { mutableStateOf((initial?.windowMinutesBefore ?: 45).toString()) }
-    var winAfter by remember { mutableStateOf((initial?.windowMinutesAfter ?: 45).toString()) }
-    var leadMin by remember { mutableStateOf((initial?.notifyLeadMinutes ?: 12).toString()) }
-    var notifyArrival by remember { mutableStateOf(initial?.notifyOnArrival ?: true) }
-    var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
+    var winBefore by rememberSaveable { mutableStateOf((initial?.windowMinutesBefore ?: 45).toString()) }
+    var winAfter by rememberSaveable { mutableStateOf((initial?.windowMinutesAfter ?: 45).toString()) }
+    var leadMin by rememberSaveable { mutableStateOf((initial?.notifyLeadMinutes ?: 12).toString()) }
+    var notifyArrival by rememberSaveable { mutableStateOf(initial?.notifyOnArrival ?: true) }
+    var enabled by rememberSaveable { mutableStateOf(initial?.enabled ?: true) }
 
-    var fromStop by remember { mutableStateOf<Stop?>(null) }
-    var toStop by remember { mutableStateOf<Stop?>(null) }
-    var pickingStops by remember { mutableStateOf(initial == null) }
+    // Stop ids, not Stop objects: Stop is not Parcelable, and after a rotation `initial` is briefly
+    // null again — so the saved ids, not the profile, are the source of truth here.
+    var fromStopId by rememberSaveable { mutableStateOf(initial?.fromStopId) }
+    var toStopId by rememberSaveable { mutableStateOf(initial?.toStopId) }
+    var pickingStops by rememberSaveable { mutableStateOf(initial == null) }
 
     var previewText by remember { mutableStateOf<String?>(null) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
+    var nameTouchedInvalid by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val graph = remember(context) { AppGraph.from(context) }
+    // Hoisted: reading resources through LocalContext inside a lambda bypasses Compose's
+    // configuration handling, so locale and font-scale changes would not reach these strings.
+    val previewNeedStops = stringResource(R.string.commute_preview_need_stops)
+    val previewDepLabel = stringResource(R.string.commute_preview_dep)
+    val previewArrLabel = stringResource(R.string.commute_preview_arr)
+    val previewLeaveLabel = stringResource(R.string.commute_preview_leave)
+    val previewNone = stringResource(R.string.commute_preview_none)
+    val needFromStop = stringResource(R.string.commute_validation_need_from_stop)
+    val needToStop = stringResource(R.string.commute_validation_need_to_stop)
+    val needDay = stringResource(R.string.commute_validation_need_day)
 
-    LaunchedEffect(initial) {
-        if (initial != null) {
-            val g = GlobalDataStore.getOrLoad()
-            if (g is ApiResult.Ok) {
-                fromStop = g.data.getStop(initial.fromStopId)?.resolveParent(g.data.stops)
-                toStop = g.data.getStop(initial.toStopId)?.resolveParent(g.data.stops)
-            }
+    val globalState = rememberGlobalData()
+    val globalData = (globalState as? GlobalDataState.Ready)?.data
+    val fromStop =
+        remember(globalData, fromStopId) {
+            globalData?.getStop(fromStopId)?.resolveParent(globalData.stops)
         }
-    }
+    val toStop =
+        remember(globalData, toStopId) {
+            globalData?.getStop(toStopId)?.resolveParent(globalData.stops)
+        }
 
     if (pickingStops) {
         StopPairPicker(
             onStopsChosen = { f, t ->
-                fromStop = f
-                toStop = t
+                fromStopId = f.id
+                toStopId = t.id
                 pickingStops = false
             },
             onCancel = onCancel,
@@ -164,10 +181,24 @@ public fun CommuteEditorScreen(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+        val nameInvalid = nameTouchedInvalid && name.isBlank()
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it },
+            onValueChange = {
+                name = it
+                // Clear the error as soon as the user acts on it, rather than leaving a stale
+                // "add a name" message under a field that now has a name in it.
+                if (it.isNotBlank()) nameTouchedInvalid = false
+                validationMessage = null
+            },
             label = { Text(stringResource(R.string.commute_name)) },
+            isError = nameInvalid,
+            supportingText =
+                if (nameInvalid) {
+                    { Text(stringResource(R.string.commute_validation_need_name)) }
+                } else {
+                    null
+                },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
@@ -186,6 +217,7 @@ public fun CommuteEditorScreen(
             selectedDays = days,
             onToggleDay = { d ->
                 days = if (days.contains(d)) days - d else days + d
+                validationMessage = null
             },
         )
 
@@ -292,10 +324,10 @@ public fun CommuteEditorScreen(
                     val f = fromStop
                     val t = toStop
                     if (f == null || t == null) {
-                        previewText = context.getString(R.string.commute_preview_need_stops)
+                        previewText = previewNeedStops
                         return@launch
                     }
-                    val globalResult = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }
+                    val globalResult = withContext(Dispatchers.IO) { graph.globalData.getOrLoad() }
                     val global =
                         when (globalResult) {
                             is ApiResult.Ok -> globalResult.data
@@ -329,7 +361,7 @@ public fun CommuteEditorScreen(
                         if (isoDayOfWeek(d) !in allowedDays) continue
                         val schedResult =
                             withContext(Dispatchers.IO) {
-                                GlobalDataStore.client.fetchScheduleForStopsInWindow(
+                                graph.client.fetchScheduleForStopsInWindow(
                                     stopIds,
                                     minTime,
                                     maxTime,
@@ -361,12 +393,17 @@ public fun CommuteEditorScreen(
                     previewText =
                         if (trip != null) {
                             val leave = trip.departureTime.minus(lead.minutes)
+                            // Formatted, not `local.toString()`: that prints the raw ISO form and
+                            // ignores the user's 12/24-hour preference.
                             "${trip.route.label} · ${trip.headsign ?: trip.tripId}\n" +
-                                "${context.getString(R.string.commute_preview_dep)} ${trip.departureTime.local}\n" +
-                                "${context.getString(R.string.commute_preview_arr)} ${trip.arrivalTime.local}\n" +
-                                "${context.getString(R.string.commute_preview_leave)} ${leave.local}"
+                                "$previewDepLabel " +
+                                "${trip.departureTime.formatDayAndClock(use24Hour)}\n" +
+                                "$previewArrLabel " +
+                                "${trip.arrivalTime.formatClock(use24Hour)}\n" +
+                                "$previewLeaveLabel " +
+                                leave.formatClock(use24Hour)
                         } else {
-                            context.getString(R.string.commute_preview_none)
+                            previewNone
                         }
                 }
             },
@@ -377,23 +414,23 @@ public fun CommuteEditorScreen(
 
         RowHorizontalButtons(onCancel = onCancel, onSave = {
             validationMessage = null
+            nameTouchedInvalid = name.isBlank()
             val f = fromStop
             val t = toStop
             val issues = mutableListOf<String>()
-            if (name.isBlank()) {
-                issues.add(context.getString(R.string.commute_validation_need_name))
-            }
             if (f == null) {
-                issues.add(context.getString(R.string.commute_validation_need_from_stop))
+                issues.add(needFromStop)
             }
             if (t == null) {
-                issues.add(context.getString(R.string.commute_validation_need_to_stop))
+                issues.add(needToStop)
             }
             if (days.isEmpty()) {
-                issues.add(context.getString(R.string.commute_validation_need_day))
+                issues.add(needDay)
             }
             if (issues.isNotEmpty()) {
                 validationMessage = issues.joinToString("\n")
+            }
+            if (issues.isNotEmpty() || nameTouchedInvalid) {
                 return@RowHorizontalButtons
             }
             val from = requireNotNull(f)
@@ -433,3 +470,17 @@ public fun CommuteEditorScreen(
         )
     }
 }
+
+/**
+ * Persists the selected weekdays across rotation and process death.
+ *
+ * `rememberSaveable` cannot bundle a `Set<Int>` on its own, so it is stored as a comma-joined
+ * string. Without this, rotating the device mid-edit silently reset the day chips.
+ */
+private val daysSaver: Saver<Set<Int>, String> =
+    Saver(
+        save = { it.sorted().joinToString(",") },
+        restore = { raw ->
+            raw.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        },
+    )

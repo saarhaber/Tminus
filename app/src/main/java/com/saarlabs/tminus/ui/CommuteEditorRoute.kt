@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,7 +30,10 @@ public fun CommuteEditorRoute(
     val scope = rememberCoroutineScope()
     val repo = remember { CommuteRepository(context.applicationContext) }
     var initial by remember { mutableStateOf<CommuteProfile?>(null) }
-    var ready by remember { mutableStateOf(false) }
+    // Saveable: while this is false the editor is not composed, and rememberSaveable values only
+    // restore into composables that are present during the restoration pass. Leaving it as plain
+    // `remember` meant every rotation dropped the whole form.
+    var ready by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(profileId) {
         initial =
             if (profileId == "new") {

@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Accessible
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +30,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -44,7 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.saarlabs.tminus.GlobalDataStore
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.features.AccessibilityRepository
@@ -63,17 +67,20 @@ import org.burnoutcrew.reorderable.reorderable
 @Composable
 public fun AccessibilityListScreen(navController: NavController) {
     val context = LocalContext.current
+    val graph = remember(context) { AppGraph.from(context) }
     val repo = remember { AccessibilityRepository(context.applicationContext) }
     var watches by remember { mutableStateOf<List<AccessibilityWatch>>(emptyList()) }
     var globalData by remember { mutableStateOf<GlobalData?>(null) }
     val scope = rememberCoroutineScope()
+    val removedMessage = stringResource(R.string.list_item_removed)
+    val undoLabel = stringResource(R.string.action_undo)
 
     LaunchedEffect(Unit) {
         watches = repo.load()
     }
 
-    LaunchedEffect(Unit) {
-        when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
+    LaunchedEffect(graph) {
+        when (val r = graph.globalData.getOrLoad()) {
             is ApiResult.Ok -> globalData = r.data
             is ApiResult.Error -> {}
         }
@@ -119,7 +126,8 @@ public fun AccessibilityListScreen(navController: NavController) {
         if (watches.isEmpty()) {
             EmptyState(
                 message = stringResource(R.string.access_list_empty),
-                hint = stringResource(R.string.empty_state_fab_hint),
+                hint = stringResource(R.string.access_list_empty_hint),
+                icon = Icons.Filled.Accessible,
                 modifier = Modifier.padding(padding),
             )
         } else {
@@ -163,10 +171,8 @@ public fun AccessibilityListScreen(navController: NavController) {
                                                 repo.save(watches)
                                                 when (
                                                     snackbarHostState.showSnackbar(
-                                                        message =
-                                                            context.getString(R.string.list_item_removed),
-                                                        actionLabel =
-                                                            context.getString(R.string.action_undo),
+                                                        message = removedMessage,
+                                                        actionLabel = undoLabel,
                                                     )
                                                 ) {
                                                     SnackbarResult.ActionPerformed -> {
@@ -216,11 +222,25 @@ public fun AccessibilityListScreen(navController: NavController) {
                                                 )
                                             },
                                 ) {
-                                    Column(Modifier.padding(16.dp)) {
-                                        Text(w.name, style = MaterialTheme.typography.titleMedium)
-                                        Text(
-                                            "${w.routeId} · ${accessWatchStopSummaryLine(w, globalData, context.resources)}",
-                                            style = MaterialTheme.typography.bodySmall,
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(w.name, style = MaterialTheme.typography.titleMedium)
+                                            Text(
+                                                "${w.routeId} · ${accessWatchStopSummaryLine(w, globalData, context.resources)}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                            )
+                                        }
+                                        // Enabling and disabling is the common edit; do it without opening the editor.
+                                        Switch(
+                                            checked = w.enabled,
+                                            onCheckedChange = { on ->
+                                                watches =
+                                                    watches.map { if (it.id == w.id) it.copy(enabled = on) else it }
+                                                scope.launch { repo.save(watches) }
+                                            },
                                         )
                                     }
                                 }

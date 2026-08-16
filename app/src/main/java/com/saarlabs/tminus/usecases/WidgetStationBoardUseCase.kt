@@ -1,123 +1,120 @@
 package com.saarlabs.tminus.usecases
 
-import com.saarlabs.tminus.model.RouteType
+import com.saarlabs.tminus.data.ScheduleRepository
 import com.saarlabs.tminus.model.Schedule
 import com.saarlabs.tminus.model.Stop
-import com.saarlabs.tminus.model.Trip
 import com.saarlabs.tminus.model.WidgetStationBoardDeparture
 import com.saarlabs.tminus.model.WidgetStationBoardOutput
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.model.response.ScheduleResponse
-import com.saarlabs.tminus.network.MbtaV3Client
 import com.saarlabs.tminus.util.EasternTimeInstant
 
-public class WidgetStationBoardUseCase(private val client: MbtaV3Client) {
+public class WidgetStationBoardUseCase internal constructor(
+    private val schedules: ScheduleRepository,
+) {
 
     public suspend fun getDepartures(
         globalData: GlobalData,
         stopId: String,
         routeFilter: String?,
-        destinationFilter: String?,
         now: EasternTimeInstant,
         limit: Int,
+        destinationFilter: String? = null,
     ): ApiResult<WidgetStationBoardOutput> {
-        val stop = globalData.getStop(stopId) ?: return ApiResult.Ok(WidgetStationBoardOutput(emptyList()))
+        val stop =
+            globalData.getStop(stopId)
+                ?: return ApiResult.Ok(WidgetStationBoardOutput(emptyList()))
         val stopIds = globalData.stopIdsForScheduleFilter(stop)
 
-        val scheduleResult = client.fetchScheduleForStops(stopIds, now)
         val scheduleResponse =
-            when (scheduleResult) {
-                is ApiResult.Ok -> scheduleResult.data
+            when (val result = schedules.scheduleForStops(stopIds, now)) {
+                is ApiResult.Ok -> result.data
                 is ApiResult.Error ->
-                    return ApiResult.Error(
-                        code = scheduleResult.code,
-                        message = scheduleResult.message,
-                    )
+                    return ApiResult.Error(code = result.code, message = result.message)
             }
 
-        val departures =
-            buildDepartures(
-                scheduleResponse = scheduleResponse,
-                globalData = globalData,
-                configuredStopId = stopId,
-                routeFilter = routeFilter,
-                destinationFilter = destinationFilter,
-                now = now,
-                limit = limit,
-            )
-        return ApiResult.Ok(WidgetStationBoardOutput(departures))
-    }
-
-    private fun buildDepartures(
-        scheduleResponse: ScheduleResponse,
-        globalData: GlobalData,
-        configuredStopId: String,
-        routeFilter: String?,
-        destinationFilter: String?,
-        now: EasternTimeInstant,
-        limit: Int,
-    ): List<WidgetStationBoardDeparture> {
-        val stops = globalData.stops
-        val relevant =
-            scheduleResponse.schedules.filter { schedule ->
-                Stop.equalOrFamily(schedule.stopId, configuredStopId, stops)
-            }
-
-        val candidates = mutableListOf<Triple<Schedule, Trip, EasternTimeInstant>>()
-
-        for (schedule in relevant) {
-            val depTime = schedule.departureTime ?: schedule.arrivalTime ?: continue
-            if (depTime < now) continue
-            val trip = scheduleResponse.trips[schedule.tripId] ?: continue
-            if (routeFilter != null && trip.routeId != routeFilter) continue
-            val headsignForFilter =
-                schedule.stopHeadsign?.takeIf { it.isNotBlank() } ?: trip.headsign
-            if (!matchesDestinationFilter(headsignForFilter, destinationFilter)) continue
-            candidates.add(Triple(schedule, trip, depTime))
-        }
-
-        val byTripId =
-            candidates
-                .groupBy { it.second.id }
-                .mapValues { (_, list) ->
-                    list.minBy { (s, _, t) -> t.instant }
-                }
-                .values
-                .sortedBy { it.third.instant }
-
-        val out = mutableListOf<WidgetStationBoardDeparture>()
-        for ((schedule, trip, depTime) in byTripId) {
-            if (out.size >= limit) break
-            val route = globalData.getRoute(trip.routeId) ?: continue
-            val scheduleStop = stops[schedule.stopId] ?: globalData.getStop(configuredStopId)!!.resolveParent(stops)
-            val platform =
-                if (scheduleStop.vehicleType == RouteType.COMMUTER_RAIL) scheduleStop.platformCode
-                else null
-            val headsign = schedule.stopHeadsign?.takeIf { it.isNotBlank() } ?: trip.headsign
-            val minutesUntil = (depTime - now).inWholeMinutes.toInt().coerceAtLeast(0)
-            out.add(
-                WidgetStationBoardDeparture(
-                    route = route,
-                    headsign = headsign,
-                    departureTime = depTime,
-                    minutesUntil = minutesUntil,
-                    platform = platform,
+        return ApiResult.Ok(
+            WidgetStationBoardOutput(
+                buildDepartures(
+                    scheduleResponse = scheduleResponse,
+                    globalData = globalData,
+                    configuredStopId = stopId,
+                    routeFilter = routeFilter,
+                    destinationFilter = destinationFilter,
+                    now = now,
+                    limit = limit,
                 ),
-            )
+            ),
+        )
+    }
+}
+
+/**
+ * The next [limit] departures at [configuredStopId], one row per trip (a trip calling at several
+ * platforms of the same station must not appear twice), ordered by departure time.
+ *
+ * Split out from the use case so it can be tested without a network round trip.
+ */
+internal fun buildDepartures(
+    scheduleResponse: ScheduleResponse,
+    globalData: GlobalData,
+    configuredStopId: String,
+    routeFilter: String?,
+    now: EasternTimeInstant,
+    limit: Int,
+    destinationFilter: String? = null,
+): List<WidgetStationBoardDeparture> {
+    val stops = globalData.stops
+    val earliestPerTrip = LinkedHashMap<String, Pair<Schedule, EasternTimeInstant>>()
+
+    for (schedule in scheduleResponse.schedules) {
+        if (!Stop.equalOrFamily(schedule.stopId, configuredStopId, stops)) continue
+        val departure = schedule.departureTime ?: schedule.arrivalTime ?: continue
+        if (departure < now) continue
+        val trip = scheduleResponse.trips[schedule.tripId] ?: continue
+        if (routeFilter != null && trip.routeId != routeFilter) continue
+        val headsign = schedule.stopHeadsign?.takeIf { it.isNotBlank() } ?: trip.headsign
+        if (!matchesDestinationFilter(headsign, destinationFilter)) continue
+
+        val existing = earliestPerTrip[schedule.tripId]
+        if (existing == null || departure < existing.second) {
+            earliestPerTrip[schedule.tripId] = schedule to departure
         }
-        return out
     }
 
-    /** Matches MBTA headsign text to a chosen direction destination (case-insensitive). */
-    private fun matchesDestinationFilter(headsign: String, filter: String?): Boolean {
-        if (filter.isNullOrBlank()) return true
-        val f = filter.trim().lowercase()
-        val h = headsign.trim().lowercase()
-        if (h == f) return true
-        val hPrimary = h.substringBefore(" - ").trim()
-        if (hPrimary == f) return true
-        if (h.startsWith(f)) return true
-        return false
-    }
+    val fallbackStop = globalData.getStop(configuredStopId)?.resolveParent(stops)
+
+    return earliestPerTrip.values
+        .sortedBy { it.second }
+        .asSequence()
+        .mapNotNull { (schedule, departure) ->
+            val trip = scheduleResponse.trips[schedule.tripId] ?: return@mapNotNull null
+            val route = globalData.getRoute(trip.routeId) ?: return@mapNotNull null
+            val scheduleStop = stops[schedule.stopId] ?: fallbackStop
+            WidgetStationBoardDeparture(
+                route = route,
+                headsign = schedule.stopHeadsign?.takeIf { it.isNotBlank() } ?: trip.headsign,
+                departureTime = departure,
+                minutesUntil = (departure - now).inWholeMinutes.toInt().coerceAtLeast(0),
+                platform = scheduleStop?.commuterRailPlatform(),
+            )
+        }
+        .take(limit)
+        .toList()
+}
+
+/**
+ * Matches MBTA headsign text against a chosen direction destination, case-insensitively.
+ *
+ * Headsigns are not always exactly the route's `direction_destinations` entry — they can carry a
+ * suffix such as "Worcester - Express" — so a prefix or leading-segment match counts.
+ */
+internal fun matchesDestinationFilter(headsign: String, filter: String?): Boolean {
+    if (filter.isNullOrBlank()) return true
+    val wanted = filter.trim().lowercase()
+    val actual = headsign.trim().lowercase()
+    if (actual == wanted) return true
+    if (actual.substringBefore(" - ").trim() == wanted) return true
+    return actual.startsWith(wanted)
 }

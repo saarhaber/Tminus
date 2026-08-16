@@ -37,6 +37,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +52,7 @@ import com.saarlabs.tminus.model.Route
 import com.saarlabs.tminus.model.Stop
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
-import com.saarlabs.tminus.GlobalDataStore
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.ui.stopOneLineDisplay
 import com.saarlabs.tminus.features.LastTrainMode
@@ -65,33 +67,39 @@ public fun LastTrainEditorScreen(
     onSave: (LastTrainProfile) -> Unit,
     onCancel: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var routeId by remember { mutableStateOf(initial?.routeId ?: "Orange") }
-    var directionId by remember { mutableStateOf(initial?.directionId ?: 0) }
+    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var routeId by rememberSaveable { mutableStateOf(initial?.routeId ?: "Orange") }
+    var directionId by rememberSaveable { mutableStateOf(initial?.directionId ?: 0) }
     var mode by remember { mutableStateOf(initial?.mode ?: LastTrainMode.LAST) }
-    var stop by remember { mutableStateOf<Stop?>(null) }
-    var notifyMin by remember { mutableStateOf((initial?.notifyMinutesBefore ?: 45).toString()) }
-    var winStart by remember { mutableStateOf(initial?.windowStartMinutes ?: 18 * 60) }
-    var winEnd by remember { mutableStateOf(initial?.windowEndMinutes ?: 23 * 60 + 59) }
-    var firstStart by remember { mutableStateOf(initial?.firstWindowStartMinutes ?: 4 * 60) }
-    var firstEnd by remember { mutableStateOf(initial?.firstWindowEndMinutes ?: 10 * 60) }
+    // Stop id, not a Stop: Stop is not Parcelable, so this is what survives a rotation.
+    var stopId by rememberSaveable { mutableStateOf(initial?.stopId) }
+    var notifyMin by rememberSaveable { mutableStateOf((initial?.notifyMinutesBefore ?: 45).toString()) }
+    var winStart by rememberSaveable { mutableStateOf(initial?.windowStartMinutes ?: 18 * 60) }
+    var winEnd by rememberSaveable { mutableStateOf(initial?.windowEndMinutes ?: 26 * 60) }
+    var firstStart by rememberSaveable { mutableStateOf(initial?.firstWindowStartMinutes ?: 4 * 60) }
+    var firstEnd by rememberSaveable { mutableStateOf(initial?.firstWindowEndMinutes ?: 10 * 60) }
     val use24Hour = rememberUse24HourTime()
-    var days by remember {
+    var days by rememberSaveable(stateSaver = daysSaver) {
         mutableStateOf((initial?.daysOfWeek ?: listOf(1, 2, 3, 4, 5, 6, 7)).toSet())
     }
-    var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
-    var showStopDialog by remember { mutableStateOf(false) }
+    var enabled by rememberSaveable { mutableStateOf(initial?.enabled ?: true) }
+    var showStopDialog by rememberSaveable { mutableStateOf(false) }
+    val routeScopedStops = rememberStopsForRoute(routeId)
     var globalData by remember { mutableStateOf<GlobalData?>(null) }
     var routeMenuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val graph = remember(context) { AppGraph.from(context) }
+
+    val stop =
+        remember(globalData, stopId) {
+            val data = globalData
+            data?.getStop(stopId)?.resolveParent(data.stops)
+        }
 
     LaunchedEffect(Unit) {
-        when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
+        when (val r = withContext(Dispatchers.IO) { graph.globalData.getOrLoad() }) {
             is ApiResult.Ok -> {
                 globalData = r.data
-                if (initial != null) {
-                    stop = r.data.getStop(initial.stopId)?.resolveParent(r.data.stops)
-                }
             }
             is ApiResult.Error -> {}
         }
@@ -230,13 +238,45 @@ public fun LastTrainEditorScreen(
                     use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                val endsAfterMidnight = winEnd >= MINUTES_PER_DAY
                 MinutesFromMidnightPickerField(
-                    minutesFromMidnight = winEnd,
-                    onMinutesChange = { winEnd = it },
+                    minutesFromMidnight = winEnd % MINUTES_PER_DAY,
+                    onMinutesChange = {
+                        winEnd = if (endsAfterMidnight) it + MINUTES_PER_DAY else it
+                    },
                     label = stringResource(R.string.last_train_window_end_min),
                     use24Hour = use24Hour,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = endsAfterMidnight,
+                                onValueChange = { after ->
+                                    winEnd =
+                                        if (after) {
+                                            (winEnd % MINUTES_PER_DAY) + MINUTES_PER_DAY
+                                        } else {
+                                            winEnd % MINUTES_PER_DAY
+                                        }
+                                },
+                                role = Role.Switch,
+                            )
+                            .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(stringResource(R.string.last_train_after_midnight))
+                        Text(
+                            text = stringResource(R.string.last_train_after_midnight_help),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = endsAfterMidnight, onCheckedChange = null)
+                }
             }
             LastTrainMode.FIRST -> {
                 MinutesFromMidnightPickerField(
@@ -288,11 +328,13 @@ public fun LastTrainEditorScreen(
         Button(
             onClick = {
                 val s = stop ?: return@Button
-                val ws = winStart.coerceIn(0, 24 * 60 - 1)
-                var we = winEnd.coerceIn(0, 24 * 60 - 1)
+                val ws = winStart.coerceIn(0, MINUTES_PER_DAY - 1)
+                // Not clamped to one day: service-day minutes above 1440 express after-midnight
+                // service, which is exactly what a "last train" window needs.
+                var we = winEnd.coerceIn(0, SERVICE_DAY_MAX_MINUTES)
                 if (we <= ws) we = (ws + 1).coerceAtMost(24 * 60 - 1)
-                val fs = firstStart.coerceIn(0, 24 * 60 - 1)
-                var fe = firstEnd.coerceIn(0, 24 * 60 - 1)
+                val fs = firstStart.coerceIn(0, MINUTES_PER_DAY - 1)
+                var fe = firstEnd.coerceIn(0, MINUTES_PER_DAY - 1)
                 if (fe <= fs) fe = (fs + 1).coerceAtMost(24 * 60 - 1)
                 val profile =
                     LastTrainProfile(
@@ -339,8 +381,10 @@ public fun LastTrainEditorScreen(
                         Text(stringResource(R.string.commute_cancel))
                     }
                     StopSearchPicker(
+                        restrictToStops = routeScopedStops,
+                        restrictionActive = true,
                         onStopChosen = {
-                            stop = it
+                            stopId = it.id
                             showStopDialog = false
                         },
                     )
@@ -349,3 +393,23 @@ public fun LastTrainEditorScreen(
         }
     }
 }
+
+/** Minutes in a calendar day. */
+private const val MINUTES_PER_DAY = 24 * 60
+
+/** Latest minute an MBTA service day reaches (26:59). */
+private const val SERVICE_DAY_MAX_MINUTES = 27 * 60 - 1
+
+/**
+ * Persists the selected weekdays across rotation and process death.
+ *
+ * `rememberSaveable` cannot bundle a `Set<Int>` on its own, so it is stored as a comma-joined
+ * string. Without this, rotating the device mid-edit silently reset the day chips.
+ */
+private val daysSaver: Saver<Set<Int>, String> =
+    Saver(
+        save = { it.sorted().joinToString(",") },
+        restore = { raw ->
+            raw.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        },
+    )
