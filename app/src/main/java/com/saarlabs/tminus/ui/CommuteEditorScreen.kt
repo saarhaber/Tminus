@@ -118,6 +118,16 @@ public fun CommuteEditorScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val graph = remember(context) { AppGraph.from(context) }
+    // Hoisted: reading resources through LocalContext inside a lambda bypasses Compose's
+    // configuration handling, so locale and font-scale changes would not reach these strings.
+    val previewNeedStops = stringResource(R.string.commute_preview_need_stops)
+    val previewDepLabel = stringResource(R.string.commute_preview_dep)
+    val previewArrLabel = stringResource(R.string.commute_preview_arr)
+    val previewLeaveLabel = stringResource(R.string.commute_preview_leave)
+    val previewNone = stringResource(R.string.commute_preview_none)
+    val needFromStop = stringResource(R.string.commute_validation_need_from_stop)
+    val needToStop = stringResource(R.string.commute_validation_need_to_stop)
+    val needDay = stringResource(R.string.commute_validation_need_day)
 
     LaunchedEffect(initial) {
         if (initial != null) {
@@ -309,7 +319,7 @@ public fun CommuteEditorScreen(
                     val f = fromStop
                     val t = toStop
                     if (f == null || t == null) {
-                        previewText = context.getString(R.string.commute_preview_need_stops)
+                        previewText = previewNeedStops
                         return@launch
                     }
                     val globalResult = withContext(Dispatchers.IO) { graph.globalData.getOrLoad() }
@@ -381,14 +391,14 @@ public fun CommuteEditorScreen(
                             // Formatted, not `local.toString()`: that prints the raw ISO form and
                             // ignores the user's 12/24-hour preference.
                             "${trip.route.label} · ${trip.headsign ?: trip.tripId}\n" +
-                                "${context.getString(R.string.commute_preview_dep)} " +
+                                "$previewDepLabel " +
                                 "${trip.departureTime.formatDayAndClock(use24Hour)}\n" +
-                                "${context.getString(R.string.commute_preview_arr)} " +
+                                "$previewArrLabel " +
                                 "${trip.arrivalTime.formatClock(use24Hour)}\n" +
-                                "${context.getString(R.string.commute_preview_leave)} " +
+                                "$previewLeaveLabel " +
                                 leave.formatClock(use24Hour)
                         } else {
-                            context.getString(R.string.commute_preview_none)
+                            previewNone
                         }
                 }
             },
@@ -404,13 +414,13 @@ public fun CommuteEditorScreen(
             val t = toStop
             val issues = mutableListOf<String>()
             if (f == null) {
-                issues.add(context.getString(R.string.commute_validation_need_from_stop))
+                issues.add(needFromStop)
             }
             if (t == null) {
-                issues.add(context.getString(R.string.commute_validation_need_to_stop))
+                issues.add(needToStop)
             }
             if (days.isEmpty()) {
-                issues.add(context.getString(R.string.commute_validation_need_day))
+                issues.add(needDay)
             }
             if (issues.isNotEmpty()) {
                 validationMessage = issues.joinToString("\n")

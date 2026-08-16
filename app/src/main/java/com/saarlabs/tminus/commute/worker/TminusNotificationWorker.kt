@@ -380,7 +380,17 @@ public class TminusNotificationWorker(
         backgroundArgb: Int? = null,
         contentArgb: Int? = null,
     ) {
-        if (!canPostNotifications()) return
+        // Inline rather than delegated to a helper so lint can see the guard, and because Android
+        // 13+ silently drops notifications without this permission — recording them as "delivered"
+        // would suppress the retry.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                applicationContext,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         val intent = Intent(applicationContext, MainActivity::class.java)
         val pi =
             PendingIntent.getActivity(
@@ -422,18 +432,6 @@ public class TminusNotificationWorker(
             val v = clean.toLong(16)
             (0xFF000000L or v).toInt()
         }.getOrNull()
-
-    /**
-     * Android 13+ drops notifications from apps without `POST_NOTIFICATIONS`. Checking first keeps
-     * the dedup bookkeeping honest: we should not record an alert as delivered when it was not.
-     */
-    private fun canPostNotifications(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
-        return ContextCompat.checkSelfPermission(
-            applicationContext,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
-    }
 
     /**
      * Drops delivery markers older than [DEDUP_RETENTION_MS].

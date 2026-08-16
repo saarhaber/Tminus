@@ -39,6 +39,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.saarlabs.tminus.ui.TminusEdgeToEdge
@@ -66,7 +70,12 @@ import com.saarlabs.tminus.ui.CommuteEditorRoute
 import com.saarlabs.tminus.ui.CommuteListScreen
 import com.saarlabs.tminus.ui.LastTrainEditorRoute
 import com.saarlabs.tminus.ui.LastTrainListScreen
+import com.saarlabs.tminus.ui.FavouriteBoardCard
+import com.saarlabs.tminus.ui.HomeBoardsLoading
+import com.saarlabs.tminus.ui.HomeBoardsState
 import com.saarlabs.tminus.ui.NotificationPermissionGate
+import com.saarlabs.tminus.ui.rememberHomeBoards
+import com.saarlabs.tminus.ui.rememberUse24HourTime
 import com.saarlabs.tminus.ui.SettingsContent
 import com.saarlabs.tminus.android.widget.WidgetUpdateWorker
 
@@ -243,7 +252,9 @@ private fun HomeTab(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
         HomeHeader()
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
+
+        HomeDeparturesSection(onOpenCommutes = onOpenCommutes)
 
         FeatureCard(
             title = stringResource(R.string.home_commutes_button),
@@ -300,15 +311,52 @@ private fun HomeTab(
                 )
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.home_hint_tabs),
-            style = MaterialTheme.typography.bodySmall,
-            color = scheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
     }
+}
+
+/**
+ * Live departures from the user's starred stations, above the navigation cards.
+ *
+ * Home is the first screen of a transit app; it should answer "when is my next train" before it
+ * offers settings. Stations are starred from any stop picker.
+ */
+@Composable
+private fun HomeDeparturesSection(onOpenCommutes: () -> Unit) {
+    val use24Hour = rememberUse24HourTime()
+    when (val state = rememberHomeBoards()) {
+        HomeBoardsState.Loading -> {
+            SectionHeading(stringResource(R.string.home_board_section))
+            HomeBoardsLoading()
+            Spacer(Modifier.height(12.dp))
+        }
+
+        HomeBoardsState.NoFavourites -> Unit
+
+        is HomeBoardsState.Ready -> {
+            if (state.boards.isEmpty()) return
+            SectionHeading(stringResource(R.string.home_board_section))
+            state.boards.forEach { board ->
+                FavouriteBoardCard(
+                    board = board,
+                    use24Hour = use24Hour,
+                    onClick = onOpenCommutes,
+                )
+                Spacer(Modifier.height(10.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+    }
+}
+
+@Composable
+private fun SectionHeading(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
 }
 
 @Composable
@@ -360,12 +408,18 @@ private fun FeatureCard(
     subtitleColor: Color,
     onClick: () -> Unit,
 ) {
+    // Merged into one semantics node with a Button role: TalkBack previously read the title,
+    // subtitle and arrow as three unrelated nodes with no indication the card was tappable.
     Card(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .clickable(onClick = onClick),
+                .clickable(onClick = onClick)
+                .semantics(mergeDescendants = true) {
+                    role = Role.Button
+                    contentDescription = "$title. $subtitle"
+                },
         colors = CardDefaults.cardColors(containerColor = background),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {

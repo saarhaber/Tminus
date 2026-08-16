@@ -68,9 +68,14 @@ Every stop picker builds its list with `getParentStopsForSelection()` (filter + 
 stops) inside a `remember` keyed on the search query, i.e. on the main thread on every keystroke.
 
 **Evidence** (`dumpsys gfxinfo`, Pixel 9a emulator):
-* scrolling the list — 37/61 janky frames (**60.7%**), p50 **61 ms**, p90 **109 ms**, p99 150 ms,
-  34 "Slow UI thread" frames
-* typing "Boston" — 8/12 janky frames (**66.7%**), p90 **150 ms**, p99 **250 ms**
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Scroll — janky frames | 60.7% (37/61) | **2.8% (3/109)** |
+| Scroll — p50 / p90 / p99 | 61 / 109 / 150 ms | **17 / 19 / 31 ms** |
+| Scroll — slow UI thread / missed vsync | 34 / 21 | **1 / 0** |
+| Type "Boston" — p90 / p99 | 150 / 250 ms | **32 / 32 ms** |
+| Type "Boston" — slow UI thread | 5 | **0** |
 
 ### [x] 5. Unbounded 60-second alarm chain refetches the network forever
 `LiveUpdateManager.ensureRunningIfNeeded` starts a self-chaining exact alarm with `durationMs = 0`

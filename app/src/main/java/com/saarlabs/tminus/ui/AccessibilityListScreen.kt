@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Accessible
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,6 +61,8 @@ public fun AccessibilityListScreen(navController: NavController) {
     val repo = remember { AccessibilityRepository(context.applicationContext) }
     var watches by remember { mutableStateOf<List<AccessibilityWatch>>(emptyList()) }
     val scope = rememberCoroutineScope()
+    val removedMessage = stringResource(R.string.list_item_removed)
+    val undoLabel = stringResource(R.string.action_undo)
 
     LaunchedEffect(Unit) {
         watches = repo.load()
@@ -105,7 +108,8 @@ public fun AccessibilityListScreen(navController: NavController) {
         if (watches.isEmpty()) {
             EmptyState(
                 message = stringResource(R.string.access_list_empty),
-                hint = stringResource(R.string.empty_state_fab_hint),
+                hint = stringResource(R.string.access_list_empty_hint),
+                icon = Icons.Filled.Accessible,
                 modifier = Modifier.padding(padding),
             )
         } else {
@@ -149,10 +153,8 @@ public fun AccessibilityListScreen(navController: NavController) {
                                                 repo.save(watches)
                                                 when (
                                                     snackbarHostState.showSnackbar(
-                                                        message =
-                                                            context.getString(R.string.list_item_removed),
-                                                        actionLabel =
-                                                            context.getString(R.string.action_undo),
+                                                        message = removedMessage,
+                                                        actionLabel = undoLabel,
                                                     )
                                                 ) {
                                                     SnackbarResult.ActionPerformed -> {

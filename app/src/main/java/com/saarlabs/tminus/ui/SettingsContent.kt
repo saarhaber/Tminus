@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
@@ -63,10 +62,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -109,6 +110,7 @@ public fun SettingsContent(
             else -> 0
         }
     val settings = remember(context) { AppGraph.from(context).settings }
+    val savedMessage = stringResource(R.string.settings_saved_snackbar)
     var dynamicColor by remember { mutableStateOf(settings.dynamicColorEnabled()) }
     var fontPercent by remember {
         mutableIntStateOf(
@@ -404,7 +406,7 @@ public fun SettingsContent(
                     onSave(v3, use24Hour)
                     scope.launch {
                         snackbarHostState.showSnackbar(
-                            context.getString(R.string.settings_saved_snackbar),
+                            savedMessage,
                         )
                     }
                 },
@@ -513,22 +515,17 @@ private fun SettingsSection(
     }
 }
 
+/** An external documentation link. Uses [LinkAnnotation], which `ClickableText` was deprecated for. */
 @Composable
 private fun DocLink(label: String, url: String) {
-    val context = LocalContext.current
-    val ann =
+    val linkStyle =
+        SpanStyle(
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+        )
+    val annotated =
         buildAnnotatedString {
-            pushStringAnnotation(tag = "URL", annotation = url)
-            withStyle(
-                style =
-                    SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        textDecoration = TextDecoration.Underline,
-                    ),
-            ) {
-                append(label)
-            }
-            pop()
+            withLink(LinkAnnotation.Url(url, TextLinkStyles(style = linkStyle))) { append(label) }
         }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
@@ -538,15 +535,6 @@ private fun DocLink(label: String, url: String) {
             modifier = Modifier.size(16.dp),
         )
         Spacer(Modifier.size(6.dp))
-        ClickableText(
-            text = ann,
-            onClick = { offset ->
-                ann.getStringAnnotations(tag = "URL", start = offset, end = offset)
-                    .firstOrNull()
-                    ?.let {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it.item)))
-                    }
-            },
-        )
+        Text(text = annotated, style = MaterialTheme.typography.bodyMedium)
     }
 }
