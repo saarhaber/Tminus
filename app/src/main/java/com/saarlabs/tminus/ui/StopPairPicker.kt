@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,11 +91,15 @@ public fun StopPairPicker(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var fromStop by remember { mutableStateOf<Stop?>(null) }
-    var toStop by remember { mutableStateOf<Stop?>(null) }
+    // Ids rather than Stop objects: Stop is not Parcelable, and holding plain `remember` state here
+    // meant a rotation mid-selection silently threw away the stops the user had already picked.
+    var fromStopId by rememberSaveable { mutableStateOf<String?>(null) }
+    var toStopId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val globalState = rememberGlobalData()
     val globalData = (globalState as? GlobalDataState.Ready)?.data
+    val fromStop = remember(globalData, fromStopId) { globalData?.getStop(fromStopId) }
+    val toStop = remember(globalData, toStopId) { globalData?.getStop(toStopId) }
     val reachable = rememberReachableStops(fromStop, globalData)
 
     val destinationStops: List<Stop>? =
@@ -114,8 +119,8 @@ public fun StopPairPicker(
                     IconButton(
                         onClick = {
                             when {
-                                toStop != null -> toStop = null
-                                fromStop != null -> fromStop = null
+                                toStopId != null -> toStopId = null
+                                fromStopId != null -> fromStopId = null
                                 else -> onCancel()
                             }
                         },
@@ -163,10 +168,10 @@ public fun StopPairPicker(
                 from = fromStop,
                 to = toStop,
                 onClearFrom = {
-                    fromStop = null
-                    toStop = null
+                    fromStopId = null
+                    toStopId = null
                 },
-                onClearTo = { toStop = null },
+                onClearTo = { toStopId = null },
             )
 
             when {
@@ -180,7 +185,7 @@ public fun StopPairPicker(
                 fromStop == null ->
                     StopPicker(
                         stops = globalData?.getParentStopsForSelection(),
-                        onStopChosen = { fromStop = it },
+                        onStopChosen = { fromStopId = it.id },
                         header = stringResource(R.string.widget_selecting_from),
                         searchPlaceholder = stringResource(R.string.widget_select_from_stop),
                     )
@@ -200,7 +205,7 @@ public fun StopPairPicker(
                         }
                         StopPicker(
                             stops = destinationStops,
-                            onStopChosen = { toStop = it },
+                            onStopChosen = { toStopId = it.id },
                             header = stringResource(R.string.widget_selecting_to),
                             searchPlaceholder = stringResource(R.string.widget_select_to_stop),
                             excludeStopId = fromStop?.id,

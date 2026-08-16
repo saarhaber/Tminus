@@ -241,6 +241,10 @@
     <string name="home_board_loading">Loading departures…</string>
     <string name="home_board_no_departures">No more departures today.</string>
 
+    <string name="settings_exact_alarm_title">Per-minute widget updates are off</string>
+    <string name="settings_exact_alarm_body">Android is blocking exact alarms for tMinus, so home-screen widgets refresh about every 15 minutes instead of every minute.</string>
+    <string name="settings_exact_alarm_action">Allow exact alarms</string>
+
     <!-- Notification channels -->
     <string name="notif_channel_last_train">Last / first train</string>
     <string name="notif_channel_accessibility">Elevator &amp; station alerts</string>

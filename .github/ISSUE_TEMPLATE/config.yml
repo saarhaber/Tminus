@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: MBTA service status
+    url: https://www.mbta.com/alerts
+    about: For actual service disruptions — tMinus only reports what the MBTA publishes.
+  - name: Security issue
+    url: https://github.com/saarhaber/Tminus/security/advisories/new
+    about: Report vulnerabilities privately rather than in a public issue.

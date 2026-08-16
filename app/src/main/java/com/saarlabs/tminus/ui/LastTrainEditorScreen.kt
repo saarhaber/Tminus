@@ -37,6 +37,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,35 +66,39 @@ public fun LastTrainEditorScreen(
     onSave: (LastTrainProfile) -> Unit,
     onCancel: () -> Unit,
 ) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var routeId by remember { mutableStateOf(initial?.routeId ?: "Orange") }
-    var directionId by remember { mutableStateOf(initial?.directionId ?: 0) }
+    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var routeId by rememberSaveable { mutableStateOf(initial?.routeId ?: "Orange") }
+    var directionId by rememberSaveable { mutableStateOf(initial?.directionId ?: 0) }
     var mode by remember { mutableStateOf(initial?.mode ?: LastTrainMode.LAST) }
-    var stop by remember { mutableStateOf<Stop?>(null) }
-    var notifyMin by remember { mutableStateOf((initial?.notifyMinutesBefore ?: 45).toString()) }
-    var winStart by remember { mutableStateOf(initial?.windowStartMinutes ?: 18 * 60) }
-    var winEnd by remember { mutableStateOf(initial?.windowEndMinutes ?: 26 * 60) }
-    var firstStart by remember { mutableStateOf(initial?.firstWindowStartMinutes ?: 4 * 60) }
-    var firstEnd by remember { mutableStateOf(initial?.firstWindowEndMinutes ?: 10 * 60) }
+    // Stop id, not a Stop: Stop is not Parcelable, so this is what survives a rotation.
+    var stopId by rememberSaveable { mutableStateOf(initial?.stopId) }
+    var notifyMin by rememberSaveable { mutableStateOf((initial?.notifyMinutesBefore ?: 45).toString()) }
+    var winStart by rememberSaveable { mutableStateOf(initial?.windowStartMinutes ?: 18 * 60) }
+    var winEnd by rememberSaveable { mutableStateOf(initial?.windowEndMinutes ?: 26 * 60) }
+    var firstStart by rememberSaveable { mutableStateOf(initial?.firstWindowStartMinutes ?: 4 * 60) }
+    var firstEnd by rememberSaveable { mutableStateOf(initial?.firstWindowEndMinutes ?: 10 * 60) }
     val use24Hour = rememberUse24HourTime()
-    var days by remember {
+    var days by rememberSaveable(stateSaver = daysSaver) {
         mutableStateOf((initial?.daysOfWeek ?: listOf(1, 2, 3, 4, 5, 6, 7)).toSet())
     }
-    var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
-    var showStopDialog by remember { mutableStateOf(false) }
+    var enabled by rememberSaveable { mutableStateOf(initial?.enabled ?: true) }
+    var showStopDialog by rememberSaveable { mutableStateOf(false) }
     val routeScopedStops = rememberStopsForRoute(routeId)
     var globalData by remember { mutableStateOf<GlobalData?>(null) }
     var routeMenuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val graph = remember(context) { AppGraph.from(context) }
 
+    val stop =
+        remember(globalData, stopId) {
+            val data = globalData
+            data?.getStop(stopId)?.resolveParent(data.stops)
+        }
+
     LaunchedEffect(Unit) {
         when (val r = withContext(Dispatchers.IO) { graph.globalData.getOrLoad() }) {
             is ApiResult.Ok -> {
                 globalData = r.data
-                if (initial != null) {
-                    stop = r.data.getStop(initial.stopId)?.resolveParent(r.data.stops)
-                }
             }
             is ApiResult.Error -> {}
         }
@@ -377,7 +383,7 @@ public fun LastTrainEditorScreen(
                         restrictToStops = routeScopedStops,
                         restrictionActive = true,
                         onStopChosen = {
-                            stop = it
+                            stopId = it.id
                             showStopDialog = false
                         },
                     )
@@ -392,3 +398,17 @@ private const val MINUTES_PER_DAY = 24 * 60
 
 /** Latest minute an MBTA service day reaches (26:59). */
 private const val SERVICE_DAY_MAX_MINUTES = 27 * 60 - 1
+
+/**
+ * Persists the selected weekdays across rotation and process death.
+ *
+ * `rememberSaveable` cannot bundle a `Set<Int>` on its own, so it is stored as a comma-joined
+ * string. Without this, rotating the device mid-edit silently reset the day chips.
+ */
+private val daysSaver: Saver<Set<Int>, String> =
+    Saver(
+        save = { it.sorted().joinToString(",") },
+        restore = { raw ->
+            raw.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        },
+    )

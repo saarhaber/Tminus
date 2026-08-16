@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,11 +118,14 @@ private fun StationBoardConfigScreen(
     onSave: (WidgetStationBoardConfig) -> Unit,
     onCancel: () -> Unit,
 ) {
-    var selectedStop by remember { mutableStateOf<Stop?>(null) }
-    var selectedRouteId by remember { mutableStateOf<String?>(null) }
+    // Ids, not Stop objects: Stop is not Parcelable, and a rotation mid-configuration should not
+    // throw away the station the user just picked.
+    var selectedStopId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedRouteId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val globalState = rememberGlobalData()
     val globalData = (globalState as? GlobalDataState.Ready)?.data
+    val selectedStop = remember(globalData, selectedStopId) { globalData?.getStop(selectedStopId) }
     val routes = rememberRoutesForStop(selectedStop)
 
     Scaffold(
@@ -132,8 +136,8 @@ private fun StationBoardConfigScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            if (selectedStop != null) {
-                                selectedStop = null
+                            if (selectedStopId != null) {
+                                selectedStopId = null
                                 selectedRouteId = null
                             } else {
                                 onCancel()
@@ -194,7 +198,7 @@ private fun StationBoardConfigScreen(
                 } else {
                     StopPicker(
                         stops = globalData?.getParentStopsForSelection(),
-                        onStopChosen = { selectedStop = it },
+                        onStopChosen = { selectedStopId = it.id },
                         header = stringResource(R.string.widget_station_board_selecting_stop),
                         searchPlaceholder =
                             stringResource(R.string.widget_station_board_select_stop_placeholder),

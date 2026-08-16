@@ -3,6 +3,7 @@ package com.saarlabs.tminus.ui
 import android.content.Context
 import android.os.Build
 import android.content.Intent
+import android.provider.Settings
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.DarkMode
@@ -49,6 +51,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -71,9 +74,13 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.SettingsKeys
+import com.saarlabs.tminus.android.widget.LiveUpdateManager
 import com.saarlabs.tminus.android.widget.WidgetUpdateWorker
 import kotlinx.coroutines.launch
 
@@ -344,6 +351,10 @@ public fun SettingsContent(
 
             Spacer(Modifier.height(16.dp))
 
+            ExactAlarmSection()
+
+            Spacer(Modifier.height(16.dp))
+
             SettingsSection(
                 icon = Icons.Filled.Key,
                 title = stringResource(R.string.settings_api_keys_title),
@@ -536,5 +547,59 @@ private fun DocLink(label: String, url: String) {
         )
         Spacer(Modifier.size(6.dp))
         Text(text = annotated, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/**
+ * Surfaces the exact-alarm permission when it is missing.
+ *
+ * On Android 12+ the user (or the system) can revoke `SCHEDULE_EXACT_ALARM` at any time, and the
+ * per-minute widget countdown quietly degrades to a 15-minute cadence when they do. Nothing in the
+ * app said so, and there was no way back — this at least explains it and links to the right screen.
+ */
+@Composable
+private fun ExactAlarmSection() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var canSchedule by remember { mutableStateOf(LiveUpdateManager.canScheduleExactAlarms(context)) }
+
+    // Re-check on resume: the user grants this in system settings and comes back.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                canSchedule = LiveUpdateManager.canScheduleExactAlarms(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (canSchedule) return
+
+    SettingsSection(
+        icon = Icons.Filled.Alarm,
+        title = stringResource(R.string.settings_exact_alarm_title),
+        body = stringResource(R.string.settings_exact_alarm_body),
+    ) {
+        Button(
+            onClick = {
+                runCatching {
+                    context.startActivity(
+                        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                            .setData(Uri.parse("package:" + context.packageName)),
+                    )
+                }.onFailure {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.parse("package:" + context.packageName)),
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+        ) {
+            Text(stringResource(R.string.settings_exact_alarm_action))
+        }
     }
 }

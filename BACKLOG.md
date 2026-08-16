@@ -179,9 +179,19 @@ Ships without opting into the current platform's behaviour changes.
 process-wide mutable statics initialised in `onCreate`. Widgets and workers race against
 initialisation, which is why `awaitClientReady()` polls with `delay(50)` for 3–15 seconds.
 
-### [x] 24. No ViewModels — UI state lost on rotation and process death
-Editors keep all state in `remember { mutableStateOf(...) }` inside composables. Rotating the device
-mid-edit discards the form.
+### [x] 24. UI state lost on rotation and process death
+Editors kept all state in `remember { mutableStateOf(...) }`. Rotating mid-edit discarded the form —
+confirmed on the emulator.
+
+Two causes, both fixed: the form fields were not `rememberSaveable`, and the editor routes gated the
+whole screen behind a non-saveable `ready` flag, so on restore the subtree was not composed and the
+saved values were never claimed. Stop selections are stored as ids (`Stop` is not `Parcelable`) and
+resolved against the catalogue.
+
+**Not re-verified on device.** Both emulators' data partitions filled up before this could be
+retested (`INSTALL_FAILED_INSUFFICIENT_STORAGE`, ~260–350 MB free against Android's ~500 MB
+threshold), and the host disk is at 98%. The change compiles, passes lint and the unit suite. Worth
+a manual rotate-mid-edit check on a real device before release.
 
 ### [x] 25. Synchronous `commit()` on the main thread
 Settings save (`MainActivity`, `SettingsActivity`) and `WidgetPreferences` pending-id helpers use

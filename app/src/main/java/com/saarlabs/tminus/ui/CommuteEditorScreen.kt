@@ -31,6 +31,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -94,27 +96,29 @@ public fun CommuteEditorScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var days by remember {
+    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var days by rememberSaveable(stateSaver = daysSaver) {
         mutableStateOf((initial?.daysOfWeek ?: listOf(1, 2, 3, 4, 5)).toSet())
     }
-    var commuteTargetMinutes by remember {
+    var commuteTargetMinutes by rememberSaveable {
         mutableStateOf(initial?.targetMinutesFromMidnight ?: 8 * 60 + 30)
     }
     val use24Hour = rememberUse24HourTime()
-    var winBefore by remember { mutableStateOf((initial?.windowMinutesBefore ?: 45).toString()) }
-    var winAfter by remember { mutableStateOf((initial?.windowMinutesAfter ?: 45).toString()) }
-    var leadMin by remember { mutableStateOf((initial?.notifyLeadMinutes ?: 12).toString()) }
-    var notifyArrival by remember { mutableStateOf(initial?.notifyOnArrival ?: true) }
-    var enabled by remember { mutableStateOf(initial?.enabled ?: true) }
+    var winBefore by rememberSaveable { mutableStateOf((initial?.windowMinutesBefore ?: 45).toString()) }
+    var winAfter by rememberSaveable { mutableStateOf((initial?.windowMinutesAfter ?: 45).toString()) }
+    var leadMin by rememberSaveable { mutableStateOf((initial?.notifyLeadMinutes ?: 12).toString()) }
+    var notifyArrival by rememberSaveable { mutableStateOf(initial?.notifyOnArrival ?: true) }
+    var enabled by rememberSaveable { mutableStateOf(initial?.enabled ?: true) }
 
-    var fromStop by remember { mutableStateOf<Stop?>(null) }
-    var toStop by remember { mutableStateOf<Stop?>(null) }
-    var pickingStops by remember { mutableStateOf(initial == null) }
+    // Stop ids, not Stop objects: Stop is not Parcelable, and after a rotation `initial` is briefly
+    // null again — so the saved ids, not the profile, are the source of truth here.
+    var fromStopId by rememberSaveable { mutableStateOf(initial?.fromStopId) }
+    var toStopId by rememberSaveable { mutableStateOf(initial?.toStopId) }
+    var pickingStops by rememberSaveable { mutableStateOf(initial == null) }
 
     var previewText by remember { mutableStateOf<String?>(null) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
-    var nameTouchedInvalid by remember { mutableStateOf(false) }
+    var nameTouchedInvalid by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val graph = remember(context) { AppGraph.from(context) }
@@ -129,21 +133,22 @@ public fun CommuteEditorScreen(
     val needToStop = stringResource(R.string.commute_validation_need_to_stop)
     val needDay = stringResource(R.string.commute_validation_need_day)
 
-    LaunchedEffect(initial) {
-        if (initial != null) {
-            val g = graph.globalData.getOrLoad()
-            if (g is ApiResult.Ok) {
-                fromStop = g.data.getStop(initial.fromStopId)?.resolveParent(g.data.stops)
-                toStop = g.data.getStop(initial.toStopId)?.resolveParent(g.data.stops)
-            }
+    val globalState = rememberGlobalData()
+    val globalData = (globalState as? GlobalDataState.Ready)?.data
+    val fromStop =
+        remember(globalData, fromStopId) {
+            globalData?.getStop(fromStopId)?.resolveParent(globalData.stops)
         }
-    }
+    val toStop =
+        remember(globalData, toStopId) {
+            globalData?.getStop(toStopId)?.resolveParent(globalData.stops)
+        }
 
     if (pickingStops) {
         StopPairPicker(
             onStopsChosen = { f, t ->
-                fromStop = f
-                toStop = t
+                fromStopId = f.id
+                toStopId = t.id
                 pickingStops = false
             },
             onCancel = onCancel,
@@ -465,3 +470,17 @@ public fun CommuteEditorScreen(
         )
     }
 }
+
+/**
+ * Persists the selected weekdays across rotation and process death.
+ *
+ * `rememberSaveable` cannot bundle a `Set<Int>` on its own, so it is stored as a comma-joined
+ * string. Without this, rotating the device mid-edit silently reset the day chips.
+ */
+private val daysSaver: Saver<Set<Int>, String> =
+    Saver(
+        save = { it.sorted().joinToString(",") },
+        restore = { raw ->
+            raw.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        },
+    )

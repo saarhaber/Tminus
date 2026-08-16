@@ -1,0 +1,63 @@
+name: Bug report
+description: Something in the app or a widget does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. If this is a security issue, please use a
+        [private advisory](https://github.com/saarhaber/Tminus/security/advisories/new) instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a station board widget
+        2. Choose Park Street
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - Home-screen widget
+        - Commute alerts
+        - Last / first train alerts
+        - Elevator & station alerts
+        - Settings
+        - Somewhere else
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: Pixel 7, Android 15
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: tMinus version
+      description: Shown on the Releases page, or the build you installed.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of `adb logcat -d | grep -i tminus`, if you have it.
+      render: text
