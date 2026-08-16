@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import com.saarlabs.tminus.AppGraph
+import com.saarlabs.tminus.R
 import com.saarlabs.tminus.model.WidgetStationBoardConfig
 import com.saarlabs.tminus.model.WidgetStationBoardDeparture
 import com.saarlabs.tminus.model.WidgetTripConfig
@@ -15,6 +16,13 @@ import com.saarlabs.tminus.model.WidgetTripData
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.ui.theme.readFontScale
 import com.saarlabs.tminus.util.EasternTimeInstant
+import com.saarlabs.tminus.FavoriteStopsStore
+import com.saarlabs.tminus.model.WidgetAlertsConfig
+import com.saarlabs.tminus.model.WidgetFavoritesConfig
+import com.saarlabs.tminus.model.response.MbtaAlertSummary
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -43,6 +51,8 @@ internal sealed interface StationBoardUiState {
     data class Ready(
         val config: WidgetStationBoardConfig,
         val stationTitle: String,
+        /** Second header line; names the chosen direction when the board is filtered to one. */
+        val scheduledSubtitle: String,
         val departures: List<WidgetStationBoardDeparture>,
         /** When the countdowns were computed; a refresh tick recomputes them without a fetch. */
         val renderedAt: EasternTimeInstant,
@@ -94,7 +104,7 @@ internal fun rememberStationBoardState(
                 if (config == null) {
                     StationBoardUiState.NeedsConfig
                 } else {
-                    withContext(Dispatchers.IO) { loadStationBoard(config) }
+                    withContext(Dispatchers.IO) { loadStationBoard(context, config) }
                 }
         }
     return state
@@ -146,7 +156,10 @@ private fun <T : Any> rememberTrigger(
             .distinctUntilChanged()
     }
 
-private suspend fun loadStationBoard(config: WidgetStationBoardConfig): StationBoardUiState {
+private suspend fun loadStationBoard(
+    context: Context,
+    config: WidgetStationBoardConfig,
+): StationBoardUiState {
     val graph = AppGraph.instance ?: return StationBoardUiState.Failed(config)
     val now = EasternTimeInstant.now()
     val globalData =
@@ -159,6 +172,7 @@ private suspend fun loadStationBoard(config: WidgetStationBoardConfig): StationB
             globalData = globalData,
             stopId = config.stopId,
             routeFilter = config.routeId,
+            destinationFilter = config.destinationHeadsign,
             now = now,
             limit = STATION_BOARD_LIMIT,
         )
@@ -174,6 +188,14 @@ private suspend fun loadStationBoard(config: WidgetStationBoardConfig): StationB
                             ?.name
                             .orEmpty()
                     },
+                scheduledSubtitle =
+                    config.destinationHeadsign?.takeIf { it.isNotBlank() }?.let { destination ->
+                        context.getString(
+                            R.string.widget_station_board_scheduled_filtered,
+                            destination,
+                        )
+                    }
+                        ?: context.getString(R.string.widget_station_board_scheduled_subtitle),
                 departures = result.data.departures,
                 renderedAt = now,
             )
@@ -202,3 +224,131 @@ private suspend fun loadTrip(config: WidgetTripConfig): TripUiState {
                 ?: TripUiState.NoTrips(config)
     }
 }
+
+// --- favorites widget ---
+
+internal sealed interface FavoritesUiState {
+    data object Loading : FavoritesUiState
+
+    /** No stops starred yet — the widget asks the user to add some rather than showing an error. */
+    data object NoFavourites : FavoritesUiState
+
+    data object Failed : FavoritesUiState
+
+    data class Ready(
+        val rows: List<FavoriteDepartureRow>,
+        val renderedAt: EasternTimeInstant,
+    ) : FavoritesUiState
+}
+
+/** See [rememberStationBoardState] for why the load lives inside the composition. */
+@Composable
+internal fun rememberFavoritesState(context: Context, appWidgetId: Int): FavoritesUiState {
+    val store = remember(context) { WidgetConfigStore(context) }
+    val trigger by
+        rememberTrigger(store) { store.favoritesConfigFlow(appWidgetId) }
+            .collectAsState(initial = store.favoritesConfig(appWidgetId) to store.refreshTick())
+    val state by
+        produceState<FavoritesUiState>(FavoritesUiState.Loading, trigger) {
+            value = withContext(Dispatchers.IO) { loadFavorites(context, trigger.first) }
+        }
+    return state
+}
+
+private suspend fun loadFavorites(
+    context: Context,
+    config: WidgetFavoritesConfig?,
+): FavoritesUiState {
+    val graph = AppGraph.instance ?: return FavoritesUiState.Failed
+    val count = (config?.count ?: DEFAULT_FAVORITES).coerceIn(1, MAX_FAVORITES)
+    val favoriteIds = FavoriteStopsStore(context.applicationContext).getIds().toList().take(count)
+    if (favoriteIds.isEmpty()) return FavoritesUiState.NoFavourites
+
+    val now = EasternTimeInstant.now()
+    val globalData =
+        when (val g = graph.globalData.getOrLoad()) {
+            is ApiResult.Ok -> g.data
+            is ApiResult.Error -> return FavoritesUiState.Failed
+        }
+
+    // One schedules lookup per favourite, run concurrently so the widget renders in roughly one
+    // round trip instead of N. They are usually served from the timetable cache.
+    val rows =
+        coroutineScope {
+            favoriteIds
+                .mapNotNull { id -> globalData.getStop(id)?.let { id to it } }
+                .map { (id, stop) ->
+                    async {
+                        val departure =
+                            when (
+                                val res =
+                                    graph.stationBoardUseCase.getDepartures(
+                                        globalData = globalData,
+                                        stopId = id,
+                                        routeFilter = null,
+                                        now = now,
+                                        limit = 1,
+                                    )
+                            ) {
+                                is ApiResult.Ok -> res.data.departures.firstOrNull()
+                                is ApiResult.Error -> null
+                            }
+                        FavoriteDepartureRow(
+                            stopName = stop.resolveParent(globalData.stops).name,
+                            departure = departure,
+                        )
+                    }
+                }
+                .awaitAll()
+        }
+
+    // Soonest first puts stops with an upcoming departure at the top; otherwise keep the user's
+    // own favourites order.
+    val ordered =
+        if (config?.sortBySoonest == true) {
+            rows.sortedBy { it.departure?.minutesUntil ?: Int.MAX_VALUE }
+        } else {
+            rows
+        }
+    return FavoritesUiState.Ready(rows = ordered, renderedAt = now)
+}
+
+// --- service alerts widget ---
+
+/** Alerts for the configured line groups. [failed] keeps the widget's error card behaviour. */
+internal data class AlertsUiState(
+    val alerts: List<MbtaAlertSummary>,
+    val failed: Boolean,
+)
+
+/** See [rememberStationBoardState] for why the load lives inside the composition. */
+@Composable
+internal fun rememberAlertsState(context: Context, appWidgetId: Int): AlertsUiState {
+    val store = remember(context) { WidgetConfigStore(context) }
+    val trigger by
+        rememberTrigger(store) { store.alertsConfigFlow(appWidgetId) }
+            .collectAsState(initial = store.alertsConfig(appWidgetId) to store.refreshTick())
+    val state by
+        produceState(AlertsUiState(emptyList(), failed = false), trigger) {
+            value = withContext(Dispatchers.IO) { loadAlerts(trigger.first) }
+        }
+    return state
+}
+
+private suspend fun loadAlerts(config: WidgetAlertsConfig?): AlertsUiState {
+    val graph = AppGraph.instance ?: return AlertsUiState(emptyList(), failed = true)
+    val routeFilter = AlertsWidgetLines.filterFor(config?.lineGroupIds ?: emptyList())
+    return when (val result = graph.client.fetchAlertsForRoute(routeFilter)) {
+        is ApiResult.Ok ->
+            AlertsUiState(
+                alerts = result.data.distinctBy { it.id }.take(MAX_ALERT_ROWS),
+                failed = false,
+            )
+        is ApiResult.Error -> AlertsUiState(emptyList(), failed = true)
+    }
+}
+
+/** Favourites shown when the widget has no saved configuration. */
+private const val DEFAULT_FAVORITES = 3
+private const val MAX_FAVORITES = 10
+private const val MAX_ALERT_ROWS = 8

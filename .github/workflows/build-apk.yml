@@ -28,6 +28,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # compileSdk 36 needs the platform + build-tools; defaults are only tools + platform-tools
+          packages: tools platform-tools platforms;android-36 build-tools;36.0.0
 
       - name: Unit tests
         run: ./gradlew test --stacktrace
@@ -65,6 +68,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: tools platform-tools platforms;android-36 build-tools;36.0.0
 
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --stacktrace

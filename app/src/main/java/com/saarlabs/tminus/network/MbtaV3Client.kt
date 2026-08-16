@@ -239,9 +239,11 @@ public class MbtaV3Client(private val apiKey: String?) {
     }
 
     /**
-     * Parent stations/stops reachable from [fromStopId] without transfers, using route patterns
-     * through that stop (same idea as PR #1593). If that yields no destinations, falls back to
-     * stations on the same route(s) as the origin.
+     * Parent stations on the same route-pattern line as [fromStopId] without transfers, using
+     * sample trips from route patterns through that stop. Stops both *after* and *before* the
+     * origin on the pattern are included so bidirectional commuter-rail pairs (e.g. Natick Center
+     * and Back Bay on Worcester Line patterns ordered toward Worcester) still appear as
+     * destinations. If that yields no destinations, falls back to stations on the same route(s).
      */
     public suspend fun fetchReachableDestinationStops(
         fromStopId: String,
@@ -251,10 +253,11 @@ public class MbtaV3Client(private val apiKey: String?) {
             val primaryResult =
                 try {
                     val reachable = mutableSetOf<String>()
-                    // Stops discovered from the included resources of the per-pattern schedule
-                    // requests. Kept in one map for the whole pass; the previous code merged into a
-                    // fresh `allStops.toMutableMap()` per pattern, which threw the results away and
-                    // copied a ~9 000-entry map on every iteration.
+                    // Also holds stops returned via `include=stop` on the sampled trips, which are
+                    // often missing from the cached catalogue (platform stops are loaded lazily).
+                    // One map for the whole pass: the previous code merged into a fresh
+                    // `allStops.toMutableMap()` per pattern, throwing the results away and copying
+                    // a ~9 000-entry map on every iteration.
                     val discoveredStops = allStops.toMutableMap()
                     paginateJsonApi(
                         path = "route_patterns",
@@ -301,9 +304,12 @@ public class MbtaV3Client(private val apiKey: String?) {
                                 orderedStopIds.indexOfFirst { sid ->
                                     Stop.equalOrFamily(sid, fromStopId, discoveredStops)
                                 }
-                            if (fromIdx < 0 || fromIdx >= orderedStopIds.lastIndex) continue
-                            for (i in (fromIdx + 1) until orderedStopIds.size) {
+                            if (fromIdx < 0) continue
+                            for (i in orderedStopIds.indices) {
+                                if (i == fromIdx) continue
                                 val sid = orderedStopIds[i]
+                                // A pattern can pass back through the origin; it is not a destination.
+                                if (Stop.equalOrFamily(sid, fromStopId, discoveredStops)) continue
                                 val raw = discoveredStops[sid] ?: continue
                                 val parent = raw.resolveParent(discoveredStops)
                                 reachable.add(parent.id)

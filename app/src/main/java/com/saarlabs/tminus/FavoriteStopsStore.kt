@@ -8,12 +8,26 @@ public class FavoriteStopsStore(context: Context) {
     private val prefs =
         context.applicationContext.getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
 
-    public fun getIds(): Set<String> =
-        prefs.getStringSet(SettingsKeys.KEY_FAVORITE_STOP_IDS, emptySet())?.toSet() ?: emptySet()
+    /** Favorites in the order the user starred them (insertion order, new stars appended). */
+    public fun getIds(): Set<String> {
+        val ordered = prefs.getString(SettingsKeys.KEY_FAVORITE_STOP_IDS_ORDERED, null)
+        if (ordered != null) {
+            return ordered.split("\n").filter { it.isNotEmpty() }.toCollection(LinkedHashSet())
+        }
+        // Migrate installs that only have the legacy unordered set; alphabetical seed keeps the
+        // migration deterministic even though the original starring order is unknown.
+        val legacy =
+            prefs.getStringSet(SettingsKeys.KEY_FAVORITE_STOP_IDS, emptySet())?.toList().orEmpty()
+        val migrated = legacy.sorted()
+        prefs.edit()
+            .putString(SettingsKeys.KEY_FAVORITE_STOP_IDS_ORDERED, migrated.joinToString("\n"))
+            .apply()
+        return migrated.toCollection(LinkedHashSet())
+    }
 
     /** @return true if the stop is now a favorite after the toggle. */
     public fun toggle(parentStopId: String): Boolean {
-        val next = getIds().toMutableSet()
+        val next = getIds().toMutableList()
         val nowFavorite =
             if (parentStopId in next) {
                 next.remove(parentStopId)
@@ -22,7 +36,10 @@ public class FavoriteStopsStore(context: Context) {
                 next.add(parentStopId)
                 true
             }
-        prefs.edit().putStringSet(SettingsKeys.KEY_FAVORITE_STOP_IDS, next).apply()
+        prefs.edit()
+            .putString(SettingsKeys.KEY_FAVORITE_STOP_IDS_ORDERED, next.joinToString("\n"))
+            .putStringSet(SettingsKeys.KEY_FAVORITE_STOP_IDS, next.toSet())
+            .apply()
         return nowFavorite
     }
 }

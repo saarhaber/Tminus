@@ -48,6 +48,7 @@ import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
 import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
+import com.saarlabs.tminus.ui.stopOneLineDisplay
 import com.saarlabs.tminus.features.AccessibilityWatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -171,7 +172,7 @@ public fun AccessibilityEditorScreen(
             Text(
                 stringResource(
                     R.string.access_stop_picked,
-                    stop?.name ?: "—",
+                    stop?.let { stopOneLineDisplay(it, context.resources) } ?: "—",
                 ),
             )
         }
@@ -204,7 +205,7 @@ public fun AccessibilityEditorScreen(
                         name = name.trim(),
                         routeId = routeId.trim(),
                         stopId = s.id,
-                        stopLabel = s.name,
+                        stopLabel = stopOneLineDisplay(s, context.resources),
                         enabled = enabled,
                     ),
                 )

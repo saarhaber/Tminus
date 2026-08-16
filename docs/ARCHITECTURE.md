@@ -68,8 +68,14 @@ wrong makes late-night departures silently vanish, which is exactly when riders 
 
 ## Widgets
 
-Two Glance widgets: `MBTATripWidget` (next trip between two stops) and `MBTAStationBoardWidget`
-(departure board for one stop).
+Four Glance widgets:
+
+| Widget | Shows |
+| --- | --- |
+| `MBTATripWidget` | Next trip between two stops, with commuter-rail specific layouts. |
+| `MBTAStationBoardWidget` | Departure board for one stop, optionally filtered to a line and direction. |
+| `MBTAFavoritesWidget` | Next departure from each starred stop. |
+| `MBTAAlertsWidget` | Active service alerts for chosen line groups. |
 
 ### The rule that matters
 
@@ -81,9 +87,10 @@ front therefore keeps that first reading for the entire life of the Glance sessi
 widgets ended up stuck on "Tap to set up" after being configured, sometimes for minutes, until the
 session happened to end.
 
-Each widget's state lives in
+Every widget's state lives in
 [`WidgetModels.kt`](../app/src/main/java/com/saarlabs/tminus/android/widget/WidgetModels.kt) and is
-produced by `rememberStationBoardState` / `rememberTripState`, which collect:
+produced by `rememberStationBoardState` / `rememberTripState` / `rememberFavoritesState` /
+`rememberAlertsState`, which collect:
 
 * the saved configuration, as a `Flow` from `WidgetConfigStore` — so a save from the configuration
   activity reaches a *live* session with no update call at all; and
@@ -105,9 +112,9 @@ what lets a tick update "3 min" to "2 min" without touching the network.
 
 ### Configuration storage
 
-`WidgetConfigStore` keeps per-widget config as JSON in `SharedPreferences`, and migrates the old
-newline-joined format in place on first read. The old format had no schema version and broke on any
-label containing a newline.
+`WidgetConfigStore` keeps per-widget config as JSON in `SharedPreferences` — trip, station board,
+favorites and alerts — and migrates the old newline-joined format in place on first read. That
+format had no schema version and broke on any label containing a newline.
 
 ## Notifications
 

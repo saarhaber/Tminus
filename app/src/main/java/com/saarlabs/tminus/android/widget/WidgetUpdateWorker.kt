@@ -1,6 +1,7 @@
 package com.saarlabs.tminus.android.widget
 
 import android.content.Context
+import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.updateAll
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -17,10 +18,11 @@ import java.util.concurrent.TimeUnit
  * so a bump produces a new composition with a recomputed countdown. [updateAll] then covers widgets
  * whose Glance session is not currently running.
  *
- * The previous implementation resolved individual Glance ids through a 12-attempt retry loop,
+ * The previous implementation resolved individual Glance ids through an 18-attempt retry loop,
  * because `getGlanceIdBy` is unreliable immediately after a widget is placed. That is no longer
  * needed: configuration changes reach a live session through the config store's flow, and this
- * worker only has to nudge everything else.
+ * worker only has to nudge everything else. [updateAll] is per-provider, so there is also no way to
+ * compose one widget type's content into another provider's instance.
  */
 public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParameters) :
     CoroutineWorker(appContext, workerParams) {
@@ -28,8 +30,9 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
     override suspend fun doWork(): Result {
         WidgetConfigStore(applicationContext).bumpRefreshTick()
         return try {
-            MBTATripWidget().updateAll(applicationContext)
-            MBTAStationBoardWidget().updateAll(applicationContext)
+            for (widget in allWidgets()) {
+                widget.updateAll(applicationContext)
+            }
             Result.success()
         } catch (e: Exception) {
             android.util.Log.w(TAG, "widget refresh failed", e)
@@ -41,6 +44,15 @@ public class WidgetUpdateWorker(appContext: Context, workerParams: WorkerParamet
         private const val TAG = "WidgetUpdateWorker"
 
         public const val PERIODIC_WORK_NAME: String = "WidgetUpdatePeriodic"
+
+        /** Every widget type the app publishes. */
+        private fun allWidgets(): List<GlanceAppWidget> =
+            listOf(
+                MBTATripWidget(),
+                MBTAStationBoardWidget(),
+                MBTAFavoritesWidget(),
+                MBTAAlertsWidget(),
+            )
 
         /**
          * Refreshes every placed widget. [appWidgetIds] is accepted so call sites can stay explicit

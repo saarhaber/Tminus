@@ -1,6 +1,7 @@
 package com.saarlabs.tminus.usecases
 
 import com.saarlabs.tminus.data.ScheduleRepository
+import com.saarlabs.tminus.model.Schedule
 import com.saarlabs.tminus.model.Stop
 import com.saarlabs.tminus.model.WidgetStationBoardDeparture
 import com.saarlabs.tminus.model.WidgetStationBoardOutput
@@ -19,6 +20,7 @@ public class WidgetStationBoardUseCase internal constructor(
         routeFilter: String?,
         now: EasternTimeInstant,
         limit: Int,
+        destinationFilter: String? = null,
     ): ApiResult<WidgetStationBoardOutput> {
         val stop =
             globalData.getStop(stopId)
@@ -39,13 +41,13 @@ public class WidgetStationBoardUseCase internal constructor(
                     globalData = globalData,
                     configuredStopId = stopId,
                     routeFilter = routeFilter,
+                    destinationFilter = destinationFilter,
                     now = now,
                     limit = limit,
                 ),
             ),
         )
     }
-
 }
 
 /**
@@ -61,9 +63,10 @@ internal fun buildDepartures(
     routeFilter: String?,
     now: EasternTimeInstant,
     limit: Int,
+    destinationFilter: String? = null,
 ): List<WidgetStationBoardDeparture> {
     val stops = globalData.stops
-    val earliestPerTrip = LinkedHashMap<String, Pair<com.saarlabs.tminus.model.Schedule, EasternTimeInstant>>()
+    val earliestPerTrip = LinkedHashMap<String, Pair<Schedule, EasternTimeInstant>>()
 
     for (schedule in scheduleResponse.schedules) {
         if (!Stop.equalOrFamily(schedule.stopId, configuredStopId, stops)) continue
@@ -71,6 +74,8 @@ internal fun buildDepartures(
         if (departure < now) continue
         val trip = scheduleResponse.trips[schedule.tripId] ?: continue
         if (routeFilter != null && trip.routeId != routeFilter) continue
+        val headsign = schedule.stopHeadsign?.takeIf { it.isNotBlank() } ?: trip.headsign
+        if (!matchesDestinationFilter(headsign, destinationFilter)) continue
 
         val existing = earliestPerTrip[schedule.tripId]
         if (existing == null || departure < existing.second) {
@@ -97,4 +102,19 @@ internal fun buildDepartures(
         }
         .take(limit)
         .toList()
+}
+
+/**
+ * Matches MBTA headsign text against a chosen direction destination, case-insensitively.
+ *
+ * Headsigns are not always exactly the route's `direction_destinations` entry — they can carry a
+ * suffix such as "Worcester - Express" — so a prefix or leading-segment match counts.
+ */
+internal fun matchesDestinationFilter(headsign: String, filter: String?): Boolean {
+    if (filter.isNullOrBlank()) return true
+    val wanted = filter.trim().lowercase()
+    val actual = headsign.trim().lowercase()
+    if (actual == wanted) return true
+    if (actual.substringBefore(" - ").trim() == wanted) return true
+    return actual.startsWith(wanted)
 }

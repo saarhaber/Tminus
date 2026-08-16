@@ -122,11 +122,24 @@ private fun StationBoardConfigScreen(
     // throw away the station the user just picked.
     var selectedStopId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedRouteId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedDestination by rememberSaveable { mutableStateOf<String?>(null) }
 
     val globalState = rememberGlobalData()
     val globalData = (globalState as? GlobalDataState.Ready)?.data
     val selectedStop = remember(globalData, selectedStopId) { globalData?.getStop(selectedStopId) }
     val routes = rememberRoutesForStop(selectedStop)
+
+    // Only offered once a line is chosen: "toward Alewife" is meaningless across mixed routes.
+    val destinationChoices =
+        remember(routes, selectedRouteId) {
+            val routeId = selectedRouteId ?: return@remember emptyList()
+            routes
+                ?.find { it.id == routeId }
+                ?.directionDestinations
+                ?.mapNotNull { destination -> destination?.trim()?.takeIf { it.isNotEmpty() } }
+                ?.distinct()
+                .orEmpty()
+        }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -139,6 +152,7 @@ private fun StationBoardConfigScreen(
                             if (selectedStopId != null) {
                                 selectedStopId = null
                                 selectedRouteId = null
+                                selectedDestination = null
                             } else {
                                 onCancel()
                             }
@@ -170,6 +184,8 @@ private fun StationBoardConfigScreen(
                                         stopId = stop.id,
                                         stopLabel = stop.name,
                                         routeId = selectedRouteId,
+                                        destinationHeadsign =
+                                            selectedRouteId?.let { selectedDestination },
                                     ),
                                 )
                             },
@@ -215,9 +231,24 @@ private fun StationBoardConfigScreen(
                     RouteFilterSection(
                         routes = routes,
                         selectedRouteId = selectedRouteId,
-                        onSelectAll = { selectedRouteId = null },
-                        onSelectRoute = { selectedRouteId = it },
+                        onSelectAll = {
+                            selectedRouteId = null
+                            selectedDestination = null
+                        },
+                        onSelectRoute = {
+                            selectedRouteId = it
+                            selectedDestination = null
+                        },
                     )
+                    if (selectedRouteId != null && destinationChoices.isNotEmpty()) {
+                        Spacer(Modifier.height(16.dp))
+                        DestinationFilterSection(
+                            destinations = destinationChoices,
+                            selectedDestination = selectedDestination,
+                            onSelectAll = { selectedDestination = null },
+                            onSelectDestination = { selectedDestination = it },
+                        )
+                    }
                 }
             }
         }
@@ -302,6 +333,42 @@ private fun RouteFilterSection(
                         } else {
                             FilterChipDefaults.filterChipColors()
                         },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Narrows the board to trips heading one way, using the route's own `direction_destinations`.
+ * Only meaningful once a single line is selected.
+ */
+@Composable
+private fun DestinationFilterSection(
+    destinations: List<String>,
+    selectedDestination: String?,
+    onSelectAll: () -> Unit,
+    onSelectDestination: (String) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.widget_station_board_destination_section),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = selectedDestination == null,
+                onClick = onSelectAll,
+                label = { Text(stringResource(R.string.widget_station_board_destination_all)) },
+            )
+            for (destination in destinations) {
+                FilterChip(
+                    selected = selectedDestination == destination,
+                    onClick = { onSelectDestination(destination) },
+                    label = { Text(destination) },
                 )
             }
         }

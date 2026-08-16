@@ -43,7 +43,6 @@ import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.FavoriteStopsStore
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.data.StopSearchIndex
-import com.saarlabs.tminus.model.RouteType
 import com.saarlabs.tminus.model.Stop
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
@@ -202,8 +201,8 @@ private fun StopRow(
         ListItem(
             headlineContent = { Text(stop.name, style = MaterialTheme.typography.bodyLarge) },
             supportingContent =
-                stopModeLabel(stop)?.let { label ->
-                    { Text(label, style = MaterialTheme.typography.bodySmall) }
+                stopSelectionSubtitle(stop).takeIf { it.isNotEmpty() }?.let { subtitle ->
+                    { Text(subtitle, style = MaterialTheme.typography.bodySmall) }
                 },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
             modifier =
@@ -223,15 +222,3 @@ private fun StopRow(
         }
     }
 }
-
-@Composable
-private fun stopModeLabel(stop: Stop): String? =
-    when (stop.vehicleType) {
-        RouteType.HEAVY_RAIL,
-        RouteType.LIGHT_RAIL,
-        -> stringResource(R.string.mode_subway)
-        RouteType.COMMUTER_RAIL -> stringResource(R.string.mode_commuter_rail)
-        RouteType.FERRY -> stringResource(R.string.mode_ferry)
-        RouteType.BUS -> stringResource(R.string.mode_bus)
-        null -> null
-    }

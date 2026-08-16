@@ -4,6 +4,8 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.saarlabs.tminus.model.WidgetAlertsConfig
+import com.saarlabs.tminus.model.WidgetFavoritesConfig
 import com.saarlabs.tminus.model.WidgetStationBoardConfig
 import com.saarlabs.tminus.model.WidgetTripConfig
 import kotlinx.coroutines.channels.awaitClose
@@ -76,6 +78,41 @@ internal class WidgetConfigStore(context: Context) {
         prefs.edit().remove(stationKey(appWidgetId)).apply()
     }
 
+    // --- favorites widget ---
+
+    fun favoritesConfig(appWidgetId: Int): WidgetFavoritesConfig? =
+        read(favoritesKey(appWidgetId), WidgetFavoritesConfig.serializer()) { legacyFavoritesConfig(it) }
+
+    fun favoritesConfigFlow(appWidgetId: Int): Flow<WidgetFavoritesConfig?> =
+        configFlow(favoritesKey(appWidgetId)) { favoritesConfig(appWidgetId) }
+
+    fun setFavoritesConfig(appWidgetId: Int, config: WidgetFavoritesConfig) {
+        write(
+            favoritesKey(appWidgetId),
+            json.encodeToString(WidgetFavoritesConfig.serializer(), config),
+        )
+    }
+
+    fun removeFavoritesConfig(appWidgetId: Int) {
+        prefs.edit().remove(favoritesKey(appWidgetId)).apply()
+    }
+
+    // --- service alerts widget ---
+
+    fun alertsConfig(appWidgetId: Int): WidgetAlertsConfig? =
+        read(alertsKey(appWidgetId), WidgetAlertsConfig.serializer()) { legacyAlertsConfig(it) }
+
+    fun alertsConfigFlow(appWidgetId: Int): Flow<WidgetAlertsConfig?> =
+        configFlow(alertsKey(appWidgetId)) { alertsConfig(appWidgetId) }
+
+    fun setAlertsConfig(appWidgetId: Int, config: WidgetAlertsConfig) {
+        write(alertsKey(appWidgetId), json.encodeToString(WidgetAlertsConfig.serializer(), config))
+    }
+
+    fun removeAlertsConfig(appWidgetId: Int) {
+        prefs.edit().remove(alertsKey(appWidgetId)).apply()
+    }
+
     // --- refresh signal ---
     //
     // A counter bumped by every refresh trigger (alarm tick, manual refresh, worker). Widget
@@ -120,6 +157,10 @@ internal class WidgetConfigStore(context: Context) {
     private fun tripKey(appWidgetId: Int) = "config_$appWidgetId"
 
     private fun stationKey(appWidgetId: Int) = "station_board_config_$appWidgetId"
+
+    private fun favoritesKey(appWidgetId: Int) = "favorites_config_$appWidgetId"
+
+    private fun alertsKey(appWidgetId: Int) = "alerts_config_$appWidgetId"
 
     private fun write(key: String, value: String) {
         prefs.edit().putString(key, value).apply()
@@ -171,6 +212,20 @@ internal class WidgetConfigStore(context: Context) {
             fromLabel = lines.getOrNull(2)?.trim().orEmpty(),
             toLabel = lines.getOrNull(3)?.trim().orEmpty(),
         )
+    }
+
+    private fun legacyFavoritesConfig(raw: String): WidgetFavoritesConfig? {
+        val lines = raw.split("\n")
+        val count = lines.getOrNull(0)?.trim()?.toIntOrNull() ?: return null
+        return WidgetFavoritesConfig(
+            count = count,
+            sortBySoonest = lines.getOrNull(1)?.trim()?.toBoolean() ?: false,
+        )
+    }
+
+    private fun legacyAlertsConfig(raw: String): WidgetAlertsConfig? {
+        val ids = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return if (ids.isEmpty()) null else WidgetAlertsConfig(lineGroupIds = ids)
     }
 
     private fun legacyStationBoardConfig(raw: String): WidgetStationBoardConfig? {
