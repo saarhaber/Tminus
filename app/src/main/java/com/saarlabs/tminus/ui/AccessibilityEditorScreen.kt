@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -44,7 +45,7 @@ import com.saarlabs.tminus.model.Route
 import com.saarlabs.tminus.model.Stop
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.model.response.GlobalData
-import com.saarlabs.tminus.GlobalDataStore
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.features.AccessibilityWatch
 import kotlinx.coroutines.Dispatchers
@@ -64,9 +65,11 @@ public fun AccessibilityEditorScreen(
     var showStopDialog by remember { mutableStateOf(false) }
     var globalData by remember { mutableStateOf<GlobalData?>(null) }
     var routeMenuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val graph = remember(context) { AppGraph.from(context) }
 
     LaunchedEffect(Unit) {
-        when (val r = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
+        when (val r = withContext(Dispatchers.IO) { graph.globalData.getOrLoad() }) {
             is ApiResult.Ok -> {
                 globalData = r.data
                 if (initial != null) {

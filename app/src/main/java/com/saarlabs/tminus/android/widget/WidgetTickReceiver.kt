@@ -10,11 +10,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Consumes each exact-alarm tick emitted by [LiveUpdateManager]: recomposes the trip widget and
- * queues the next alarm. We use [goAsync] so the Glance update can run on a coroutine without the
- * system killing the process before the broadcast returns, and we always call
- * [android.content.BroadcastReceiver.PendingResult.finish] so the process can return to its idle
- * power state between ticks.
+ * Consumes each tick from [LiveUpdateManager]: refreshes the widgets and queues the next alarm.
+ *
+ * A tick is cheap. Bumping the refresh signal recomposes every widget, and the countdown is derived
+ * from timetable data that [com.saarlabs.tminus.data.ScheduleRepository] already holds — so a tick
+ * normally performs no network I/O at all. Before that cache existed, every minute cost one
+ * `/schedules` request per placed widget.
+ *
+ * [goAsync] keeps the process alive across the coroutine, and the result is always finished so the
+ * process can return to idle between ticks.
  */
 public class WidgetTickReceiver : BroadcastReceiver() {
 
@@ -32,6 +36,7 @@ public class WidgetTickReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
+                WidgetConfigStore(appCtx).bumpRefreshTick()
                 MBTATripWidget().updateAll(appCtx)
                 MBTAStationBoardWidget().updateAll(appCtx)
             } catch (t: Throwable) {

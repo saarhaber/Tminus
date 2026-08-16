@@ -22,6 +22,9 @@ public object LiveUpdateManager {
 
     internal const val TICK_INTERVAL_MS: Long = 60_000L
 
+    /** Cadence while the screen is off: nobody is reading the countdown. */
+    internal const val IDLE_INTERVAL_MS: Long = 15L * 60_000L
+
     /** Hard cap on how long a single live session is allowed to run without being explicitly renewed. */
     public const val DEFAULT_DURATION_MS: Long = 30L * 60_000L
 
@@ -117,6 +120,11 @@ public object LiveUpdateManager {
     /**
      * Queues the next tick. Called from [WidgetTickReceiver] after each update to keep the cadence;
      * the receiver — not this manager — is what holds the process alive during a tick.
+     *
+     * While the screen is off nobody can see the countdown, so the cadence drops to
+     * [IDLE_INTERVAL_MS] and the alarm becomes inexact. A per-minute wake-up on a pocketed phone is
+     * pure battery cost — and because the countdown is now recomputed from cached timetable data,
+     * the first tick after the screen comes back on is correct immediately.
      */
     internal fun scheduleNext(context: Context) {
         val appCtx = context.applicationContext
@@ -124,21 +132,44 @@ public object LiveUpdateManager {
             stop(appCtx)
             return
         }
-        if (!canScheduleExactAlarms(appCtx)) {
-            // Permission revoked mid-chain. Stop silently rather than crashing with SecurityException.
+        if (!hasPlacedWidgets(appCtx)) {
             stop(appCtx)
             return
         }
         val alarmManager = appCtx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val triggerAt = SystemClock.elapsedRealtime() + TICK_INTERVAL_MS
-        // setExactAndAllowWhileIdle still fires under Doze; the system rate-limits it to ~9 min per
-        // app in deep idle, which is fine for foreground widget use and recovers on unlock.
+        val pendingIntent = buildPendingIntent(appCtx)
+
+        if (!isInteractive(appCtx)) {
+            alarmManager.set(
+                AlarmManager.ELAPSED_REALTIME,
+                SystemClock.elapsedRealtime() + IDLE_INTERVAL_MS,
+                pendingIntent,
+            )
+            return
+        }
+
+        if (!canScheduleExactAlarms(appCtx)) {
+            // Permission revoked mid-chain. Keep ticking inexactly rather than going dark: the
+            // countdown drifts a little, but the widget still updates.
+            alarmManager.set(
+                AlarmManager.ELAPSED_REALTIME,
+                SystemClock.elapsedRealtime() + TICK_INTERVAL_MS,
+                pendingIntent,
+            )
+            return
+        }
+
         alarmManager.setExactAndAllowWhileIdle(
             AlarmManager.ELAPSED_REALTIME_WAKEUP,
-            triggerAt,
-            buildPendingIntent(appCtx),
+            SystemClock.elapsedRealtime() + TICK_INTERVAL_MS,
+            pendingIntent,
         )
     }
+
+    private fun isInteractive(context: Context): Boolean =
+        runCatching {
+            (context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isInteractive
+        }.getOrDefault(true)
 
     private fun buildPendingIntent(context: Context): PendingIntent {
         val intent = Intent(context, WidgetTickReceiver::class.java).apply {

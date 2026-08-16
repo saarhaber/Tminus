@@ -5,7 +5,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -13,7 +16,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.util.EasternTimeInstant
-import com.saarlabs.tminus.GlobalDataStore
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.commute.CommuteRepository
@@ -41,15 +44,14 @@ public class TminusNotificationWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
+    private val graph get() = AppGraph.from(applicationContext)
+
     override suspend fun doWork(): Result =
         withContext(Dispatchers.IO) {
-            // Process start can run WorkManager before [TminusApplication.refreshNetworking] assigns [GlobalDataStore.client].
-            GlobalDataStore.awaitClientReady(timeoutMs = 15_000L)
-            if (!GlobalDataStore.isClientReady()) {
-                // Retry so we evaluate alerts after the app finishes initializing (not a permanent skip).
-                return@withContext Result.retry()
-            }
+            // AppGraph builds itself on first use, so a worker that starts the process never has
+            // to wait for Application.onCreate to finish wiring networking.
             val prefs = applicationContext.getSharedPreferences(PREFS_STATE, Context.MODE_PRIVATE)
+            pruneDeliveredKeys(prefs)
 
             runCommuteNotifications(prefs)
             runLastTrainNotifications(prefs)
@@ -63,7 +65,7 @@ public class TminusNotificationWorker(
         val profiles = repo.loadProfiles().filter { it.enabled }
         if (profiles.isEmpty()) return
 
-        val globalResult = GlobalDataStore.getOrLoad()
+        val globalResult = graph.globalData.getOrLoad()
         val global =
             when (globalResult) {
                 is ApiResult.Ok -> globalResult.data
@@ -92,7 +94,7 @@ public class TminusNotificationWorker(
             val minTime = minutesToHHmm(windowStart)
             val maxTime = minutesToHHmm(windowEnd)
 
-            val schedResult = GlobalDataStore.client.fetchScheduleForStopsInWindow(stopIds, minTime, maxTime)
+            val schedResult = graph.client.fetchScheduleForStopsInWindow(stopIds, minTime, maxTime)
             val schedule =
                 when (schedResult) {
                     is ApiResult.Ok -> schedResult.data
@@ -127,6 +129,7 @@ public class TminusNotificationWorker(
                     prefs.edit().putBoolean(leaveKey, true).apply()
                     notify(
                         id = leaveKey.hashCode(),
+                        channelId = TminusNotificationChannels.COMMUTE,
                         title = applicationContext.getString(R.string.notif_leave_title),
                         text =
                             applicationContext.getString(
@@ -159,6 +162,7 @@ public class TminusNotificationWorker(
                         val toName = profile.toLabel.ifBlank { trip.toStop.name }
                         notify(
                             id = arrivalKey.hashCode(),
+                            channelId = TminusNotificationChannels.COMMUTE,
                             title = applicationContext.getString(R.string.notif_arrival_title),
                             text =
                                 applicationContext.getString(
@@ -186,7 +190,7 @@ public class TminusNotificationWorker(
         val profiles = repo.load().filter { it.enabled }
         if (profiles.isEmpty()) return
 
-        val globalResult = GlobalDataStore.getOrLoad()
+        val globalResult = graph.globalData.getOrLoad()
         val global =
             when (globalResult) {
                 is ApiResult.Ok -> globalResult.data
@@ -207,7 +211,7 @@ public class TminusNotificationWorker(
             val depResult =
                 when (p.mode) {
                     LastTrainMode.LAST ->
-                        GlobalDataStore.client.fetchLastDepartureInWindow(
+                        graph.client.fetchLastDepartureInWindow(
                             p.routeId,
                             p.directionId,
                             p.stopId,
@@ -215,7 +219,7 @@ public class TminusNotificationWorker(
                             minutesToHHmm(p.windowEndMinutes),
                         )
                     LastTrainMode.FIRST ->
-                        GlobalDataStore.client.fetchFirstDepartureInWindow(
+                        graph.client.fetchFirstDepartureInWindow(
                             p.routeId,
                             p.directionId,
                             p.stopId,
@@ -247,6 +251,7 @@ public class TminusNotificationWorker(
                     val route = global.getRoute(p.routeId)
                     notify(
                         id = key.hashCode(),
+                        channelId = TminusNotificationChannels.LAST_TRAIN,
                         title = modeLabel,
                         text =
                             applicationContext.getString(
@@ -274,7 +279,7 @@ public class TminusNotificationWorker(
         val watches = repo.load().filter { it.enabled }
         if (watches.isEmpty()) return
 
-        val globalResult = GlobalDataStore.getOrLoad()
+        val globalResult = graph.globalData.getOrLoad()
         val global =
             when (globalResult) {
                 is ApiResult.Ok -> globalResult.data
@@ -291,13 +296,12 @@ public class TminusNotificationWorker(
         for (w in watches) {
             val stop = global.getStop(w.stopId) ?: continue
             val stopName = w.stopLabel.ifBlank { stop.name }
-            val tokens =
-                stopName
-                    .lowercase()
-                    .split(Regex("\\s+"))
-                    .filter { it.length >= 4 }
 
-            val alertsResult = GlobalDataStore.client.fetchAlertsForRoute(w.routeId)
+            val alertsResult =
+                graph.client.fetchAlertsForRoute(
+                    routeId = w.routeId,
+                    stopIds = global.stopIdsForScheduleFilter(stop),
+                )
             val alerts =
                 when (alertsResult) {
                     is ApiResult.Ok -> alertsResult.data
@@ -308,12 +312,6 @@ public class TminusNotificationWorker(
                 val effect = alert.effect ?: continue
                 if (effect !in relevantEffects) continue
 
-                val headerLower = alert.header.lowercase()
-                val matchesStation =
-                    headerLower.contains(stopName.lowercase()) ||
-                        tokens.any { headerLower.contains(it) }
-                if (!matchesStation) continue
-
                 val key = "acc_${w.id}_${alert.id}"
                 if (prefs.getBoolean(key, false)) continue
                 prefs.edit().putBoolean(key, true).apply()
@@ -321,6 +319,7 @@ public class TminusNotificationWorker(
                 val route = global.getRoute(w.routeId)
                 notify(
                     id = key.hashCode(),
+                    channelId = TminusNotificationChannels.ACCESSIBILITY,
                     title = applicationContext.getString(R.string.notif_accessibility_title),
                     text =
                         applicationContext.getString(
@@ -346,9 +345,17 @@ public class TminusNotificationWorker(
             kotlinx.datetime.DayOfWeek.SUNDAY -> 7
         }
 
+    /**
+     * Minutes-from-midnight as an MBTA service-day `HH:mm`.
+     *
+     * Hours are **not** clamped to 23: the MBTA expresses after-midnight service as 24:00–26:59 on
+     * the previous service day, and "last train home" windows routinely need it. Clamping here is
+     * what made it impossible to ask about a train leaving at 00:40.
+     */
     private fun minutesToHHmm(minutes: Int): String {
-        val h = (minutes / 60).coerceIn(0, 23)
-        val m = (minutes % 60).coerceIn(0, 59)
+        val total = minutes.coerceIn(0, SERVICE_DAY_MAX_MINUTES)
+        val h = total / 60
+        val m = total % 60
         return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
     }
 
@@ -365,12 +372,13 @@ public class TminusNotificationWorker(
 
     private fun notify(
         id: Int,
+        channelId: String,
         title: String,
         text: String,
         backgroundArgb: Int? = null,
         contentArgb: Int? = null,
     ) {
-        ensureChannel(applicationContext)
+        if (!canPostNotifications()) return
         val intent = Intent(applicationContext, MainActivity::class.java)
         val pi =
             PendingIntent.getActivity(
@@ -391,7 +399,7 @@ public class TminusNotificationWorker(
             }
         val custom = buildRemoteViews()
         val notif =
-            NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+            NotificationCompat.Builder(applicationContext, channelId)
                 .setSmallIcon(R.drawable.ic_stat_tminus)
                 .setContentTitle(title)
                 .setContentText(text)
@@ -413,26 +421,45 @@ public class TminusNotificationWorker(
             (0xFF000000L or v).toInt()
         }.getOrNull()
 
-    private fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            mgr.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    context.getString(R.string.notif_channel_commute),
-                    NotificationManager.IMPORTANCE_HIGH,
-                ).apply {
-                    setShowBadge(true)
-                },
-            )
-        }
+    /**
+     * Android 13+ drops notifications from apps without `POST_NOTIFICATIONS`. Checking first keeps
+     * the dedup bookkeeping honest: we should not record an alert as delivered when it was not.
+     */
+    private fun canPostNotifications(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            applicationContext,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Drops delivery markers older than [DEDUP_RETENTION_MS].
+     *
+     * Each fired notification writes a `leave_<profile>_<trip>_<epochMs>` flag so it is not repeated.
+     * Nothing removed them, so the file grew for the lifetime of the install and was re-parsed on
+     * every worker run. Keys carry their timestamp, so expiry is a parse away.
+     */
+    private fun pruneDeliveredKeys(prefs: android.content.SharedPreferences) {
+        val cutoff = System.currentTimeMillis() - DEDUP_RETENTION_MS
+        val expired =
+            prefs.all.keys.filter { key ->
+                val stamp = key.substringAfterLast('_').toLongOrNull() ?: return@filter false
+                stamp < cutoff
+            }
+        if (expired.isEmpty()) return
+        prefs.edit().apply { expired.forEach { remove(it) } }.apply()
     }
 
     public companion object {
         public const val UNIQUE_NAME: String = "TminusNotifications"
         private const val PREFS_STATE = "tminus_notif_state"
-        /** Bumped so existing installs pick up [NotificationManager.IMPORTANCE_HIGH] without stale channel settings. */
-        private const val CHANNEL_ID = "commute_v2"
+
+        /** Latest minute a service day can reach (26:59), so after-midnight trains are expressible. */
+        private const val SERVICE_DAY_MAX_MINUTES = 27 * 60 - 1
+
+        /** How long a "already notified" marker is kept before being pruned. */
+        private const val DEDUP_RETENTION_MS = 3L * 24L * 60L * 60L * 1000L
         /**
          * Fire the "leave" notification only if we're this close to the exact target time
          * ([leaveAtMs] / [notifyAt]). The main firing mechanism is now a precise WorkManager

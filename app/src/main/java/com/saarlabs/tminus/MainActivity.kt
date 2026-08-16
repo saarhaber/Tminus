@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.saarlabs.tminus.ui.TminusEdgeToEdge
 import com.saarlabs.tminus.ui.theme.TminusTheme
 import com.saarlabs.tminus.ui.theme.rememberUserDarkTheme
 import androidx.compose.runtime.Composable
@@ -74,10 +74,10 @@ public class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        val prefs = getSharedPreferences(SettingsKeys.PREFS, MODE_PRIVATE)
+        val settings = AppGraph.from(this).settings
         setContent {
             val darkTheme = rememberUserDarkTheme()
+            TminusEdgeToEdge(darkTheme)
             TminusTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -90,35 +90,23 @@ public class MainActivity : ComponentActivity() {
                         startDestination = ROUTE_MAIN_TABS,
                     ) {
                         composable(ROUTE_MAIN_TABS) {
-                            var settingsV3 by remember {
-                                mutableStateOf(prefs.getString(SettingsKeys.KEY_V3_API, "") ?: "")
-                            }
+                            var settingsV3 by remember { mutableStateOf(settings.apiKey().orEmpty()) }
                             var settingsUse24Hour by remember {
-                                mutableStateOf(prefs.getBoolean(SettingsKeys.KEY_USE_24_HOUR, false))
+                                mutableStateOf(settings.use24HourTime())
                             }
                             TminusApp(
                                 rootNavController = rootNav,
                                 initialV3 = settingsV3,
                                 initialUse24Hour = settingsUse24Hour,
                                 onSaveSettings = { v3, use24Hour ->
-                                    prefs.edit()
-                                        .putString(SettingsKeys.KEY_V3_API, v3.ifBlank { null })
-                                        .putBoolean(SettingsKeys.KEY_USE_24_HOUR, use24Hour)
-                                        .commit()
-                                    GlobalDataStore.invalidate()
-                                    runCatching { TminusApplication.refreshNetworking() }
-                                        .onFailure {
-                                            Log.e("MainActivity", "refreshNetworking failed", it)
-                                        }
-                                    settingsV3 = prefs.getString(SettingsKeys.KEY_V3_API, "") ?: ""
-                                    settingsUse24Hour =
-                                        prefs.getBoolean(SettingsKeys.KEY_USE_24_HOUR, false)
+                                    settings.setApiKey(v3)
+                                    settings.setUse24HourTime(use24Hour)
+                                    settingsV3 = settings.apiKey().orEmpty()
+                                    settingsUse24Hour = settings.use24HourTime()
                                     runCatching {
-                                        WidgetUpdateWorker.enqueueRefresh(
-                                            this@MainActivity,
-                                            appWidgetIds = null,
-                                        )
-                                    }.onFailure { Log.e("MainActivity", "enqueueRefresh failed", it) }
+                                        AppGraph.from(this@MainActivity).onApiKeyChanged()
+                                        WidgetUpdateWorker.enqueueRefresh(this@MainActivity)
+                                    }.onFailure { Log.e(TAG, "applying settings failed", it) }
                                 },
                             )
                         }
@@ -149,14 +137,9 @@ public class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onStop() {
-        super.onStop()
-        // When the user leaves the app (e.g. returns to the home screen), refresh trip widgets
-        // so they are not stuck on a loading or stale state.
-        WidgetUpdateWorker.enqueueRefresh(this, appWidgetIds = null)
-    }
-
     public companion object {
+        private const val TAG = "MainActivity"
+
         public const val ROUTE_MAIN_TABS: String = "main_tabs"
         public const val ROUTE_COMMUTE_LIST: String = "commute_list"
         public const val ROUTE_COMMUTE_EDIT: String = "commute_edit"

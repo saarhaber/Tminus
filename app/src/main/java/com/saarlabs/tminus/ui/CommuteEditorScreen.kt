@@ -44,7 +44,7 @@ import com.saarlabs.tminus.model.Stop
 import com.saarlabs.tminus.model.WidgetTripData
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.util.EasternTimeInstant
-import com.saarlabs.tminus.GlobalDataStore
+import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.commute.CommuteProfile
 import com.saarlabs.tminus.commute.CommuteTripPlanner
@@ -116,10 +116,11 @@ public fun CommuteEditorScreen(
     var validationMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val graph = remember(context) { AppGraph.from(context) }
 
     LaunchedEffect(initial) {
         if (initial != null) {
-            val g = GlobalDataStore.getOrLoad()
+            val g = graph.globalData.getOrLoad()
             if (g is ApiResult.Ok) {
                 fromStop = g.data.getStop(initial.fromStopId)?.resolveParent(g.data.stops)
                 toStop = g.data.getStop(initial.toStopId)?.resolveParent(g.data.stops)
@@ -295,7 +296,7 @@ public fun CommuteEditorScreen(
                         previewText = context.getString(R.string.commute_preview_need_stops)
                         return@launch
                     }
-                    val globalResult = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }
+                    val globalResult = withContext(Dispatchers.IO) { graph.globalData.getOrLoad() }
                     val global =
                         when (globalResult) {
                             is ApiResult.Ok -> globalResult.data
@@ -329,7 +330,7 @@ public fun CommuteEditorScreen(
                         if (isoDayOfWeek(d) !in allowedDays) continue
                         val schedResult =
                             withContext(Dispatchers.IO) {
-                                GlobalDataStore.client.fetchScheduleForStopsInWindow(
+                                graph.client.fetchScheduleForStopsInWindow(
                                     stopIds,
                                     minTime,
                                     maxTime,

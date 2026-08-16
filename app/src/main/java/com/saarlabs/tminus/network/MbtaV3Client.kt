@@ -1,5 +1,6 @@
 package com.saarlabs.tminus.network
 
+import android.util.Log
 import com.saarlabs.tminus.model.LocationType
 import com.saarlabs.tminus.model.Route
 import com.saarlabs.tminus.model.RouteType
@@ -49,7 +50,21 @@ public class MbtaV3Client(private val apiKey: String?) {
      * Without a key, requests stay sequential to stay within the lower anonymous limit.
      */
     private companion object {
+        const val TAG = "MbtaV3Client"
         const val KEYED_PARALLEL_PAGES = 8
+
+        /** 03:00 the next calendar morning, expressed in MBTA service-day hours. */
+        const val SERVICE_DAY_END = "27:00"
+
+        /**
+         * [instant] as an `HH:mm` offset from the start of its service day, so times between
+         * midnight and 03:00 become 24:00–26:59 rather than wrapping to the next day.
+         */
+        fun serviceDayTime(instant: EasternTimeInstant): String {
+            val local = instant.local
+            val hour = if (local.hour < 3) local.hour + 24 else local.hour
+            return "${hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}"
+        }
     }
 
     private val json =
@@ -147,6 +162,18 @@ public class MbtaV3Client(private val apiKey: String?) {
         }
 
     /**
+     * Parent stations served by [routeId], for pickers that must only offer stops on a chosen route.
+     */
+    public suspend fun fetchStopsForRoute(routeId: String): ApiResult<List<Stop>> =
+        withContext(Dispatchers.IO) {
+            try {
+                ApiResult.Ok(fetchParentStopsForRoute(routeId, mutableMapOf()))
+            } catch (e: Throwable) {
+                ApiResult.Error(message = describeMbtaRequestFailure(e))
+            }
+        }
+
+    /**
      * Parent stations on [routeId] (merged into [stops] for any stops missing from cache).
      */
     private suspend fun fetchParentStopsForRoute(
@@ -224,6 +251,11 @@ public class MbtaV3Client(private val apiKey: String?) {
             val primaryResult =
                 try {
                     val reachable = mutableSetOf<String>()
+                    // Stops discovered from the included resources of the per-pattern schedule
+                    // requests. Kept in one map for the whole pass; the previous code merged into a
+                    // fresh `allStops.toMutableMap()` per pattern, which threw the results away and
+                    // copied a ~9 000-entry map on every iteration.
+                    val discoveredStops = allStops.toMutableMap()
                     paginateJsonApi(
                         path = "route_patterns",
                         pageLimit = 50,
@@ -248,7 +280,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                                     }
                                     .body<JsonObject>()
 
-                            mergeIncludedStops(schedDoc, allStops.toMutableMap())
+                            mergeIncludedStops(schedDoc, discoveredStops)
 
                             val schedData = schedDoc.get("data")?.asJsonArrayOrNull() ?: continue
                             val orderedStopIds =
@@ -267,13 +299,13 @@ public class MbtaV3Client(private val apiKey: String?) {
 
                             val fromIdx =
                                 orderedStopIds.indexOfFirst { sid ->
-                                    Stop.equalOrFamily(sid, fromStopId, allStops)
+                                    Stop.equalOrFamily(sid, fromStopId, discoveredStops)
                                 }
                             if (fromIdx < 0 || fromIdx >= orderedStopIds.lastIndex) continue
                             for (i in (fromIdx + 1) until orderedStopIds.size) {
                                 val sid = orderedStopIds[i]
-                                val raw = allStops[sid] ?: continue
-                                val parent = raw.resolveParent(allStops)
+                                val raw = discoveredStops[sid] ?: continue
+                                val parent = raw.resolveParent(discoveredStops)
                                 reachable.add(parent.id)
                             }
                         }
@@ -281,7 +313,7 @@ public class MbtaV3Client(private val apiKey: String?) {
 
                     ApiResult.Ok(
                         reachable
-                            .mapNotNull { allStops[it] }
+                            .mapNotNull { discoveredStops[it] }
                             .filter { it.parentStationId == null }
                             .sortedBy { it.name },
                     )
@@ -330,14 +362,24 @@ public class MbtaV3Client(private val apiKey: String?) {
             ?.takeIf { !it.startsWith("canonical-") }
     }
 
+    /**
+     * Every remaining departure at [stopIds] on the service day containing [now].
+     *
+     * MBTA service days run past midnight, and the V3 API expresses that with hours ≥ 24 (a train
+     * leaving at 00:40 on Saturday belongs to Friday's service day at "24:40"). Both the window and
+     * the explicit `filter[date]` therefore use [EasternTimeInstant.serviceDate], not the calendar
+     * date — otherwise late-night riders see an empty board exactly when they need it.
+     */
     public suspend fun fetchScheduleForStops(
         stopIds: List<String>,
         now: EasternTimeInstant,
-    ): ApiResult<ScheduleResponse> {
-        val minTime =
-            "${now.local.hour.toString().padStart(2, '0')}:${now.local.minute.toString().padStart(2, '0')}"
-        return fetchScheduleForStopsInWindow(stopIds, minTime, "23:59")
-    }
+    ): ApiResult<ScheduleResponse> =
+        fetchScheduleForStopsInWindow(
+            stopIds = stopIds,
+            minTime = serviceDayTime(now),
+            maxTime = SERVICE_DAY_END,
+            serviceDate = now.serviceDate,
+        )
 
     /**
      * Schedules at [fromStopIds] with departure times between [minTime] and [maxTime] (HH:mm, Eastern).
@@ -432,9 +474,17 @@ public class MbtaV3Client(private val apiKey: String?) {
     }
 
     /**
-     * Active alerts for a route (paginated). Used for elevator / accessibility watches.
+     * Active alerts for a route, optionally narrowed to the stops in [stopIds].
+     *
+     * Passing stop ids uses the API's own informed-entity filter, which is exact. The alternative —
+     * fetching every alert on the route and testing whether its headline mentions the station name —
+     * both misses alerts (headlines do not always name the stop) and fires on unrelated ones
+     * (tokens like "Street", "Square" and "Center" appear all over the network).
      */
-    public suspend fun fetchAlertsForRoute(routeId: String): ApiResult<List<com.saarlabs.tminus.model.response.MbtaAlertSummary>> =
+    public suspend fun fetchAlertsForRoute(
+        routeId: String,
+        stopIds: List<String> = emptyList(),
+    ): ApiResult<List<com.saarlabs.tminus.model.response.MbtaAlertSummary>> =
         withContext(Dispatchers.IO) {
             try {
                 val out = mutableListOf<com.saarlabs.tminus.model.response.MbtaAlertSummary>()
@@ -443,6 +493,9 @@ public class MbtaV3Client(private val apiKey: String?) {
                     pageLimit = 50,
                     configure = {
                         parameter("filter[route]", routeId)
+                        if (stopIds.isNotEmpty()) {
+                            parameter("filter[stop]", stopIds.joinToString(","))
+                        }
                     },
                 ) { doc ->
                     for (el in doc.dataArrayElements()) {
@@ -476,6 +529,7 @@ public class MbtaV3Client(private val apiKey: String?) {
         stopId: String,
         minTime: String,
         maxTime: String,
+        serviceDate: LocalDate? = null,
     ): ApiResult<DepartureLookupResult> =
         withContext(Dispatchers.IO) {
             try {
@@ -487,6 +541,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                             parameter("filter[stop]", stopId)
                             parameter("filter[min_time]", minTime)
                             parameter("filter[max_time]", maxTime)
+                            if (serviceDate != null) parameter("filter[date]", serviceDate.toString())
                             parameter("page[limit]", "500")
                         }
                         .body<JsonObject>()
@@ -516,6 +571,7 @@ public class MbtaV3Client(private val apiKey: String?) {
         stopId: String,
         minTime: String,
         maxTime: String,
+        serviceDate: LocalDate? = null,
     ): ApiResult<DepartureLookupResult> =
         withContext(Dispatchers.IO) {
             try {
@@ -527,6 +583,7 @@ public class MbtaV3Client(private val apiKey: String?) {
                             parameter("filter[stop]", stopId)
                             parameter("filter[min_time]", minTime)
                             parameter("filter[max_time]", maxTime)
+                            if (serviceDate != null) parameter("filter[date]", serviceDate.toString())
                             parameter("page[limit]", "500")
                         }
                         .body<JsonObject>()
@@ -736,24 +793,28 @@ public class MbtaV3Client(private val apiKey: String?) {
         }
     }
 
+    /**
+     * A short, user-safe description of a failed request.
+     *
+     * Exception text (socket errors, TLS chains, serializer stack context) is logged but never
+     * returned: these strings are rendered directly in widgets and configuration screens.
+     */
     private fun describeMbtaRequestFailure(e: Throwable): String {
-        when (e) {
-            is ClientRequestException -> {
-                val status = e.response.status
-                return when (status) {
+        Log.w(TAG, "MBTA request failed", e)
+        return when (e) {
+            is ClientRequestException ->
+                when (e.response.status) {
                     HttpStatusCode.Forbidden ->
-                        "MBTA API rejected the key (403). Clear the key in Settings or paste the full key from api-v3.mbta.com."
+                        "MBTA rejected the API key. Clear it in Settings, or paste the full key from api-v3.mbta.com."
                     HttpStatusCode.Unauthorized ->
-                        "MBTA API unauthorized (401). Check your V3 API key in Settings."
+                        "MBTA did not accept the API key. Check it in Settings."
                     HttpStatusCode.TooManyRequests ->
-                        "MBTA API rate limit (429). Try again in a few minutes."
-                    else ->
-                        "MBTA API error ${status.value}${e.message?.let { ": $it" } ?: ""}"
+                        "MBTA is rate limiting requests. Try again in a few minutes, or add an API key in Settings."
+                    else -> "MBTA returned an error (${e.response.status.value})."
                 }
-            }
-            is ResponseException ->
-                return "MBTA API error ${e.response.status.value}${e.message?.let { ": $it" } ?: ""}"
-            else -> return e.message ?: e.toString()
+            is ResponseException -> "MBTA returned an error (${e.response.status.value})."
+            is java.io.IOException -> "Could not reach the MBTA. Check your connection."
+            else -> "Could not load MBTA data. Try again."
         }
     }
 }

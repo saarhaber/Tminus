@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -43,135 +44,68 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.saarlabs.tminus.model.WidgetStationBoardConfig
 import com.saarlabs.tminus.model.WidgetStationBoardDeparture
-import com.saarlabs.tminus.model.response.ApiResult
-import com.saarlabs.tminus.usecases.WidgetStationBoardUseCase
 import com.saarlabs.tminus.ui.theme.readFontScale
-import com.saarlabs.tminus.util.EasternTimeInstant
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
-import com.saarlabs.tminus.SettingsKeys
-import com.saarlabs.tminus.TminusApplication
-import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.android.util.colorFromHex
 import com.saarlabs.tminus.android.util.formattedTime
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 public class MBTAStationBoardWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Exact
 
-    private val useCase: WidgetStationBoardUseCase
-        get() = TminusApplication.widgetStationBoardUseCase
-
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        try {
-            provideGlanceInternal(context, id)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            android.util.Log.e("MBTAStationBoardWidget", "provideGlance failed", e)
-            provideContent { StationBoardContent.ErrorState(context = context) }
-        }
-    }
+        val appWidgetId =
+            runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }
+                .getOrDefault(INVALID_WIDGET_ID)
 
-    private suspend fun provideGlanceInternal(context: Context, id: GlanceId) {
-        val widgetPreferences = WidgetPreferences(context.applicationContext)
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            provideContent { StationBoardContent.ErrorState(context = context) }
-            return
-        }
-
-        var config = withContext(Dispatchers.IO) { widgetPreferences.getStationBoardConfigOnce(appWidgetId) }
-        if (config == null) {
-            repeat(8) {
-                delay(250)
-                config = withContext(Dispatchers.IO) { widgetPreferences.getStationBoardConfigOnce(appWidgetId) }
-                if (config != null) return@repeat
-            }
-        }
-        if (config == null) {
-            // #region agent log
-            AgentDebugLog.log(
-                "MBTAStationBoardWidget.kt:provideGlanceInternal",
-                "showing station configure prompt (no saved config)",
-                "H4",
-                mapOf("appWidgetId" to appWidgetId),
-            )
-            // #endregion
-            withContext(Dispatchers.IO) {
-                WidgetPreferences(context.applicationContext).setPendingStationBoardConfigWidgetId(appWidgetId)
-            }
-            provideContent {
-                StationBoardContent.ConfigurePrompt(context = context, appWidgetId = appWidgetId)
-            }
-            return
-        }
-
-        val cfg = checkNotNull(config)
-        GlobalDataStore.awaitClientReady()
-        val use24Hour =
-            withContext(Dispatchers.IO) {
-                context.applicationContext
-                    .getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
-                    .getBoolean(SettingsKeys.KEY_USE_24_HOUR, false)
-            }
-        val fontScale = withContext(Dispatchers.IO) { readFontScale(context.applicationContext) }
-        val globalData =
-            when (val globalResult = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }) {
-                is ApiResult.Ok -> globalResult.data
-                is ApiResult.Error -> {
-                    when (
-                        val retry =
-                            withContext(Dispatchers.IO) {
-                                GlobalDataStore.getOrLoad(forceRefresh = true)
-                            }
-                    ) {
-                        is ApiResult.Ok -> retry.data
-                        is ApiResult.Error -> {
-                            provideContent {
-                                StationBoardContent.LoadError(context = context, config = cfg, fontScale = fontScale)
-                            }
-                            return
-                        }
-                    }
+        // Everything the widget needs is resolved *inside* provideContent. Loading it here instead
+        // would freeze the first reading for the life of the Glance session, because update() only
+        // recomposes already-registered content.
+        provideContent {
+            val prefs = rememberDisplayPrefs(context)
+            when (val state = rememberStationBoardState(context, appWidgetId)) {
+                StationBoardUiState.Invalid ->
+                    StationBoardContent.ErrorState(context = context)
+                StationBoardUiState.Loading ->
+                    StationBoardContent.LoadingState(context = context, fontScale = prefs.fontScale)
+                StationBoardUiState.NeedsConfig -> {
+                    RememberPendingConfigId(context, appWidgetId)
+                    StationBoardContent.ConfigurePrompt(context = context, appWidgetId = appWidgetId)
                 }
-            }
-
-        val result =
-            withContext(Dispatchers.IO) {
-                useCase.getDepartures(
-                    globalData = globalData,
-                    stopId = cfg.stopId,
-                    routeFilter = cfg.routeId,
-                    now = EasternTimeInstant.now(),
-                    limit = 12,
-                )
-            }
-
-        when (result) {
-            is ApiResult.Error -> {
-                provideContent { StationBoardContent.LoadError(context = context, config = cfg, fontScale = fontScale) }
-            }
-            is ApiResult.Ok -> {
-                val departures = result.data.departures
-                val stationTitle =
-                    cfg.stopLabel.ifEmpty {
-                        globalData.getStop(cfg.stopId)?.resolveParent(globalData.stops)?.name.orEmpty()
-                    }
-                provideContent {
+                is StationBoardUiState.Failed ->
+                    StationBoardContent.LoadError(
+                        context = context,
+                        config = state.config,
+                        fontScale = prefs.fontScale,
+                    )
+                is StationBoardUiState.Ready ->
                     StationBoardContent.Board(
                         context = context,
-                        stationTitle = stationTitle,
-                        departures = departures,
-                        use24Hour = use24Hour,
-                        fontScale = fontScale,
+                        stationTitle = state.stationTitle,
+                        departures = state.departures,
+                        use24Hour = prefs.use24Hour,
+                        fontScale = prefs.fontScale,
                     )
-                }
             }
+        }
+    }
+}
+
+/**
+ * Records the app-widget id the user is being asked to configure.
+ *
+ * Some launchers start the configuration activity without `EXTRA_APPWIDGET_ID`; this is how the
+ * activity recovers which widget it belongs to.
+ */
+@Composable
+private fun RememberPendingConfigId(context: Context, appWidgetId: Int) {
+    if (appWidgetId == INVALID_WIDGET_ID) return
+    LaunchedEffect(appWidgetId) {
+        withContext(Dispatchers.IO) {
+            WidgetConfigStore(context).setPendingStationBoardConfigWidgetId(appWidgetId)
         }
     }
 }
@@ -346,6 +280,35 @@ private object StationBoardContent {
                         maxLines = 1,
                     )
                 }
+            }
+        }
+    }
+
+    /** Shown while the first load is in flight, so the widget never flashes the setup prompt. */
+    @Composable
+    fun LoadingState(context: Context, fontScale: Float) {
+        GlanceTheme {
+            val t = typography(fontScale)
+            Column(
+                modifier =
+                    GlanceModifier.fillMaxSize()
+                        .background(surfaceColor(context))
+                        .cornerRadius(20.dp)
+                        .padding(t.padding),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = context.getString(R.string.loading),
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    style =
+                        TextStyle(
+                            color = ColorProvider(secondaryTextColor(context)),
+                            fontSize = t.caption,
+                            textAlign = TextAlign.Center,
+                        ),
+                    maxLines = 1,
+                )
             }
         }
     }

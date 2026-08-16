@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -42,134 +43,68 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.saarlabs.tminus.model.WidgetTripConfig
 import com.saarlabs.tminus.model.WidgetTripData
-import com.saarlabs.tminus.model.response.ApiResult
-import com.saarlabs.tminus.usecases.WidgetTripUseCase
 import com.saarlabs.tminus.ui.theme.readFontScale
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
-import com.saarlabs.tminus.SettingsKeys
-import com.saarlabs.tminus.TminusApplication
-import com.saarlabs.tminus.GlobalDataStore
 import com.saarlabs.tminus.android.util.formattedTime
 import com.saarlabs.tminus.android.util.colorFromHex
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 public class MBTATripWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Exact
 
-    private val widgetTripUseCase: WidgetTripUseCase
-        get() = TminusApplication.widgetTripUseCase
-
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        try {
-            provideGlanceInternal(context, id)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            android.util.Log.e("MBTATripWidget", "provideGlance failed", e)
-            provideContent { WidgetContent.ErrorState(context = context) }
+        val appWidgetId =
+            runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }
+                .getOrDefault(INVALID_WIDGET_ID)
+
+        // See MBTAStationBoardWidget: the load must live inside provideContent so that update()
+        // — and a save from the configuration activity — actually change what is drawn.
+        provideContent {
+            val prefs = rememberDisplayPrefs(context)
+            when (val state = rememberTripState(context, appWidgetId)) {
+                TripUiState.Invalid ->
+                    WidgetContent.ErrorState(context = context)
+                TripUiState.Loading ->
+                    WidgetContent.LoadingState(context = context, fontScale = prefs.fontScale)
+                TripUiState.NeedsConfig -> {
+                    RememberPendingTripConfigId(context, appWidgetId)
+                    WidgetContent.ConfigurePrompt(context = context, appWidgetId = appWidgetId)
+                }
+                is TripUiState.Failed ->
+                    WidgetContent.LoadError(
+                        context = context,
+                        config = state.config,
+                        fontScale = prefs.fontScale,
+                    )
+                is TripUiState.NoTrips ->
+                    WidgetContent.NoTrips(
+                        context = context,
+                        config = state.config,
+                        fontScale = prefs.fontScale,
+                    )
+                is TripUiState.Ready ->
+                    WidgetContent.TripData(
+                        context = context,
+                        config = state.config,
+                        tripData = state.trip,
+                        use24Hour = prefs.use24Hour,
+                        fontScale = prefs.fontScale,
+                    )
+            }
         }
     }
+}
 
-    private suspend fun provideGlanceInternal(context: Context, id: GlanceId) {
-        val widgetPreferences = WidgetPreferences(context.applicationContext)
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            provideContent { WidgetContent.ErrorState(context = context) }
-            return
-        }
-
-        var config = withContext(Dispatchers.IO) { widgetPreferences.getConfigOnce(appWidgetId) }
-        if (config == null) {
-            repeat(8) {
-                delay(250)
-                config = withContext(Dispatchers.IO) { widgetPreferences.getConfigOnce(appWidgetId) }
-                if (config != null) return@repeat
-            }
-        }
-        if (config == null) {
-            // #region agent log
-            AgentDebugLog.log(
-                "MBTATripWidget.kt:provideGlanceInternal",
-                "showing trip configure prompt (no saved config)",
-                "H4",
-                mapOf("appWidgetId" to appWidgetId),
-            )
-            // #endregion
-            withContext(Dispatchers.IO) {
-                WidgetPreferences(context.applicationContext).setPendingConfigWidgetId(appWidgetId)
-            }
-            provideContent {
-                WidgetContent.ConfigurePrompt(context = context, appWidgetId = appWidgetId)
-            }
-            return
-        }
-
-        val cfg = checkNotNull(config)
-        GlobalDataStore.awaitClientReady()
-        val use24Hour =
-            withContext(Dispatchers.IO) {
-                context.applicationContext
-                    .getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
-                    .getBoolean(SettingsKeys.KEY_USE_24_HOUR, false)
-            }
-        val fontScale = withContext(Dispatchers.IO) { readFontScale(context.applicationContext) }
-        val globalData =
-            when (
-                val globalResult = withContext(Dispatchers.IO) { GlobalDataStore.getOrLoad() }
-            ) {
-                is ApiResult.Ok -> globalResult.data
-                is ApiResult.Error -> {
-                    when (
-                        val retry =
-                            withContext(Dispatchers.IO) {
-                                GlobalDataStore.getOrLoad(forceRefresh = true)
-                            }
-                    ) {
-                        is ApiResult.Ok -> retry.data
-                        is ApiResult.Error -> {
-                            provideContent {
-                                WidgetContent.LoadError(context = context, config = cfg, fontScale = fontScale)
-                            }
-                            return
-                        }
-                    }
-                }
-            }
-
-        val result =
-            withContext(Dispatchers.IO) {
-                widgetTripUseCase.getNextTrip(
-                    globalData = globalData,
-                    fromStopId = cfg.fromStopId,
-                    toStopId = cfg.toStopId,
-                )
-            }
-
-        when (result) {
-            is ApiResult.Error -> {
-                provideContent { WidgetContent.LoadError(context = context, config = cfg, fontScale = fontScale) }
-            }
-            is ApiResult.Ok -> {
-                val tripData = result.data.trip
-                provideContent {
-                    if (tripData != null) {
-                        WidgetContent.TripData(
-                            context = context,
-                            config = cfg,
-                            tripData = tripData,
-                            use24Hour = use24Hour,
-                            fontScale = fontScale,
-                        )
-                    } else {
-                        WidgetContent.NoTrips(context = context, config = cfg, fontScale = fontScale)
-                    }
-                }
-            }
+/** See `RememberPendingConfigId` in the station-board widget. */
+@Composable
+private fun RememberPendingTripConfigId(context: Context, appWidgetId: Int) {
+    if (appWidgetId == INVALID_WIDGET_ID) return
+    LaunchedEffect(appWidgetId) {
+        withContext(Dispatchers.IO) {
+            WidgetConfigStore(context).setPendingTripConfigWidgetId(appWidgetId)
         }
     }
 }
@@ -315,6 +250,35 @@ private object WidgetContent {
                         maxLines = 1,
                     )
                 }
+            }
+        }
+    }
+
+    /** Shown while the first load is in flight, so the widget never flashes the setup prompt. */
+    @Composable
+    fun LoadingState(context: Context, fontScale: Float) {
+        GlanceTheme {
+            val t = typography(fontScale)
+            Column(
+                modifier =
+                    GlanceModifier.fillMaxSize()
+                        .background(surface(context))
+                        .cornerRadius(20.dp)
+                        .padding(t.padding),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = context.getString(R.string.loading),
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    style =
+                        TextStyle(
+                            color = ColorProvider(onSurfaceVariant(context)),
+                            fontSize = t.caption,
+                            textAlign = TextAlign.Center,
+                        ),
+                    maxLines = 1,
+                )
             }
         }
     }

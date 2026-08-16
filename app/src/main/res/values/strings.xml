@@ -209,4 +209,18 @@
     <string name="widget_station_board_route_all">All lines</string>
     <string name="widget_station_board_loading_routes">Loading lines…</string>
     <string name="widget_station_board_save">Add widget</string>
+
+    <!-- Stop picker -->
+    <string name="stop_search_empty">No stops available yet. Check your connection and try again.</string>
+    <string name="stop_search_no_results">No stops match “%1$s”.</string>
+    <string name="stop_picker_route_scoped_header">Stops on this route</string>
+    <string name="stop_picker_route_scoped_empty">No stops found for this route. Pick a different route.</string>
+    <string name="mode_subway">Subway</string>
+    <string name="mode_commuter_rail">Commuter rail</string>
+    <string name="mode_ferry">Ferry</string>
+    <string name="mode_bus">Bus</string>
+
+    <!-- Notification channels -->
+    <string name="notif_channel_last_train">Last / first train</string>
+    <string name="notif_channel_accessibility">Elevator &amp; station alerts</string>
 </resources>
