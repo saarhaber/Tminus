@@ -4,6 +4,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +29,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -204,11 +207,25 @@ public fun AccessibilityListScreen(navController: NavController) {
                                                 )
                                             },
                                 ) {
-                                    Column(Modifier.padding(16.dp)) {
-                                        Text(w.name, style = MaterialTheme.typography.titleMedium)
-                                        Text(
-                                            "${w.routeId} · ${w.stopLabel.ifBlank { w.stopId }}",
-                                            style = MaterialTheme.typography.bodySmall,
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(w.name, style = MaterialTheme.typography.titleMedium)
+                                            Text(
+                                                "${w.routeId} · ${w.stopLabel.ifBlank { w.stopId }}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                            )
+                                        }
+                                        // Enabling and disabling is the common edit; do it without opening the editor.
+                                        Switch(
+                                            checked = w.enabled,
+                                            onCheckedChange = { on ->
+                                                watches =
+                                                    watches.map { if (it.id == w.id) it.copy(enabled = on) else it }
+                                                scope.launch { repo.save(watches) }
+                                            },
                                         )
                                     }
                                 }

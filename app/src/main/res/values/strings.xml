@@ -245,6 +245,20 @@
     <string name="settings_exact_alarm_body">Android is blocking exact alarms for tMinus, so home-screen widgets refresh about every 15 minutes instead of every minute.</string>
     <string name="settings_exact_alarm_action">Allow exact alarms</string>
 
+    <string name="day_summary_none">No days selected</string>
+    <string name="day_summary_every_day">Every day</string>
+    <string name="day_summary_weekdays">Weekdays</string>
+    <string name="day_summary_weekends">Weekends</string>
+    <string-array name="weekday_short_labels">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+
     <!-- Notification channels -->
     <string name="notif_channel_last_train">Last / first train</string>
     <string name="notif_channel_accessibility">Elevator &amp; station alerts</string>

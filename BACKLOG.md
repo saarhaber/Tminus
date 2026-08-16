@@ -9,6 +9,26 @@ directly rather than inferred.
 
 Status legend: `[ ]` open · `[x]` done
 
+## Verification status
+
+Everything below is implemented, and the whole tree passes `./gradlew test :app:lintDebug
+assembleDebug assembleRelease` (72 unit tests, lint with `abortOnError`).
+
+Most items were also confirmed by hand on a Pixel 9a emulator (API 36) — the widget configuration
+fix, search ranking, the frame-time measurements, Home departures, dynamic colour, the Settings
+layout, API-key masking, the exact-alarm notice, route-coloured chips and the bottom-anchored picker
+action.
+
+**Three groups of changes were not re-checked on a device**, because both available emulators ran out
+of data-partition space partway through (`INSTALL_FAILED_INSUFFICIENT_STORAGE` with ~260–350 MB free
+against Android's ~500 MB reserve) and the host disk is at 98%:
+
+* item 24 — rotation and process-death state retention;
+* item 31 — the inline enable/disable toggles on list rows;
+* item 45 — the exact-alarm button's navigation into system settings.
+
+These are worth a manual pass before release.
+
 ---
 
 ## P0 — Critical

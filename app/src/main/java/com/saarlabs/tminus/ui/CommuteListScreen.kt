@@ -5,8 +5,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +30,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -41,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -208,23 +213,53 @@ public fun CommuteListScreen(
                                                 )
                                             },
                                 ) {
-                                    Column(Modifier.padding(16.dp)) {
-                                        Text(p.name, style = MaterialTheme.typography.titleMedium)
-                                        Text(
-                                            "${p.fromLabel.ifBlank { p.fromStopId }} → ${p.toLabel.ifBlank { p.toStopId }}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                        Text(
-                                            stringResource(
-                                                R.string.commute_list_summary,
-                                                formatMinutesFromMidnight(
-                                                    p.targetMinutesFromMidnight,
-                                                    use24Hour,
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                text = p.name,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color =
+                                                    if (p.enabled) {
+                                                        MaterialTheme.colorScheme.onSurface
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                    },
+                                            )
+                                            Text(
+                                                "${p.fromLabel.ifBlank { p.fromStopId }} → ${p.toLabel.ifBlank { p.toStopId }}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            Spacer(Modifier.height(6.dp))
+                                            DaySummary(days = p.daysOfWeek.toSet())
+                                            Spacer(Modifier.height(4.dp))
+                                            Text(
+                                                stringResource(
+                                                    R.string.commute_list_summary,
+                                                    formatMinutesFromMidnight(
+                                                        p.targetMinutesFromMidnight,
+                                                        use24Hour,
+                                                    ),
+                                                    p.notifyLeadMinutes,
                                                 ),
-                                                p.notifyLeadMinutes,
-                                            ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        // Toggling a commute is the most common edit; it should not
+                                        // require opening the editor.
+                                        Switch(
+                                            checked = p.enabled,
+                                            onCheckedChange = { on ->
+                                                profiles =
+                                                    profiles.map {
+                                                        if (it.id == p.id) it.copy(enabled = on) else it
+                                                    }
+                                                scope.launch { repo.saveProfiles(profiles) }
+                                            },
                                         )
                                     }
                                 }
@@ -235,4 +270,23 @@ public fun CommuteListScreen(
             }
         }
     }
+}
+
+/** Compact "Mon Tue Wed" style summary of the days a profile runs on. */
+@Composable
+internal fun DaySummary(days: Set<Int>) {
+    val labels = stringArrayResource(R.array.weekday_short_labels)
+    val text =
+        when {
+            days.isEmpty() -> stringResource(R.string.day_summary_none)
+            days.size == 7 -> stringResource(R.string.day_summary_every_day)
+            days == setOf(1, 2, 3, 4, 5) -> stringResource(R.string.day_summary_weekdays)
+            days == setOf(6, 7) -> stringResource(R.string.day_summary_weekends)
+            else -> days.sorted().joinToString(" ") { labels.getOrElse(it - 1) { "" } }
+        }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+    )
 }

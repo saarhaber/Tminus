@@ -5,9 +5,12 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +31,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -208,16 +212,32 @@ public fun LastTrainListScreen(navController: NavController) {
                                                 )
                                             },
                                 ) {
-                                    Column(Modifier.padding(16.dp)) {
-                                        Text(p.name, style = MaterialTheme.typography.titleMedium)
-                                        Text(
-                                            "${p.routeId} · ${if (p.mode == LastTrainMode.LAST) stringResource(R.string.last_train_mode_last) else stringResource(R.string.last_train_mode_first)} · ${p.stopLabel.ifBlank { p.stopId }}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                        Text(
-                                            lastTrainTimingSummary(resources, p, use24Hour),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(p.name, style = MaterialTheme.typography.titleMedium)
+                                            Text(
+                                                "${p.routeId} · ${if (p.mode == LastTrainMode.LAST) stringResource(R.string.last_train_mode_last) else stringResource(R.string.last_train_mode_first)} · ${p.stopLabel.ifBlank { p.stopId }}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                            )
+                                            Text(
+                                                lastTrainTimingSummary(resources, p, use24Hour),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                                Spacer(Modifier.height(6.dp))
+                                                DaySummary(days = p.daysOfWeek.toSet())
+                                        }
+                                        // Enabling and disabling is the common edit; do it without opening the editor.
+                                        Switch(
+                                            checked = p.enabled,
+                                            onCheckedChange = { on ->
+                                                profiles =
+                                                    profiles.map { if (it.id == p.id) it.copy(enabled = on) else it }
+                                                scope.launch { repo.save(profiles) }
+                                            },
                                         )
                                     }
                                 }
