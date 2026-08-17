@@ -31,6 +31,7 @@ import com.saarlabs.tminus.android.util.formattedTime
 import com.saarlabs.tminus.model.WidgetTripData
 import kotlin.math.min
 import kotlin.math.sqrt
+import com.saarlabs.tminus.android.util.tripTrackText
 
 /**
  * Layouts for the subway / bus / ferry trip widget — everything that is not commuter rail, which

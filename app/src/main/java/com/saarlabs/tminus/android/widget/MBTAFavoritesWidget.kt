@@ -42,6 +42,7 @@ import com.saarlabs.tminus.android.util.formattedTime
 import com.saarlabs.tminus.model.WidgetStationBoardDeparture
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.util.EasternTimeInstant
+import com.saarlabs.tminus.android.util.clockWithTrack
 
 internal data class FavoriteDepartureRow(
     val stopName: String,

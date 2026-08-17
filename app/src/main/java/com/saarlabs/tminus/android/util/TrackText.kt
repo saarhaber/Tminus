@@ -1,4 +1,4 @@
-package com.saarlabs.tminus.android.widget
+package com.saarlabs.tminus.android.util
 
 import android.content.Context
 import com.saarlabs.tminus.R

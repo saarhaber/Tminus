@@ -33,6 +33,8 @@ import com.saarlabs.tminus.model.RouteType
 import com.saarlabs.tminus.model.WidgetTripData
 import com.saarlabs.tminus.android.util.formattedTime
 import kotlin.math.min
+import com.saarlabs.tminus.android.util.departureTrackText
+import com.saarlabs.tminus.android.util.tripTrackText
 
 /**
  * Responsive commuter-rail style trip widget: master (large), compact (square), and inline

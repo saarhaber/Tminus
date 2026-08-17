@@ -45,9 +45,22 @@ All notable changes to tMinus are recorded here. The format follows
   saved.
 - Home's station cards truncated the destination to "Wor…" when the route name was long, because
   the route chip and the destination shared one line. The chip now sits above the destination.
+- The last/first train notification printed a raw ISO timestamp (`2026-08-17T23:45`) for the
+  departure instead of a formatted clock time in the user's chosen 12/24-hour style.
+- Accessibility alerts notified again on every worker run. Delivery markers expired on the number
+  at the end of their key, which is an epoch for trip alerts but an MBTA alert id for these — read
+  as a timestamp, six digits is January 1970, so the marker was always already expired. Markers now
+  record when they were delivered, and service alerts keep theirs for 30 days rather than 3.
 
 ### Changed
 
+- Notifications are drawn by the platform instead of a custom `RemoteViews`. The old layout painted
+  the whole notification in the route colour and hard-coded the text colours, which ignored dark
+  mode, Material You and font settings, and clipped long alert text to one line. The line colour now
+  tints the notification the way Android expects, long text expands, and each alert carries the
+  commute or watch name as its sub-text, the scheduled time as its timestamp, and its track where
+  there is one. "Time to leave" leads with the countdown and retires itself ten minutes after the
+  train has gone.
 - The next trip widget (subway, bus and ferry) was relaid out. "min" now sits on the countdown's
   baseline instead of on the body's next line, where it drifted away from its own digits as the
   widget grew; the departure and arrival times moved into a footer band that lines up with the stop

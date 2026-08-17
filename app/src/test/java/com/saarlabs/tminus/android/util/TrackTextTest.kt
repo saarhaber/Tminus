@@ -1,4 +1,4 @@
-package com.saarlabs.tminus.android.widget
+package com.saarlabs.tminus.android.util
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
  * Track codes come straight from MBTA's `platform_code`, which is absent for every mode except
  * commuter rail and occasionally present but empty.
  */
-class WidgetTrackTextTest {
+class TrackTextTest {
 
     @Test
     fun bothEndsOfATripKeepTheirOwnTrack() {
