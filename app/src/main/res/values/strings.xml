@@ -294,6 +294,14 @@
     <string name="widget_favorites_subtitle">Next departures</string>
     <string name="widget_favorites_empty">Add favorite stops in tMinus to see them here.</string>
     <string name="widget_favorites_error">Departures unavailable. Open tMinus or check your connection.</string>
+    <string name="widget_preview_fav_row1_stop">Davis</string>
+    <string name="widget_preview_fav_row1_headsign">Ashmont</string>
+    <string name="widget_preview_fav_row1_min">3 min</string>
+    <string name="widget_preview_fav_row1_clock">7:45 AM</string>
+    <string name="widget_preview_fav_row2_stop">Back Bay</string>
+    <string name="widget_preview_fav_row2_headsign">Forest Hills</string>
+    <string name="widget_preview_fav_row2_min">8 min</string>
+    <string name="widget_preview_fav_row2_clock">7:52 AM</string>
     <string name="widget_favorites_configure_title">Favorite stops widget</string>
     <string name="widget_favorites_count_label">Stops to show</string>
     <string name="widget_favorites_sort_soonest">Show soonest departures first</string>
@@ -304,6 +312,10 @@
     <string name="widget_alerts_subtitle">Subway lines</string>
     <string name="widget_alerts_none">All lines running normally.</string>
     <string name="widget_alerts_error">Alerts unavailable. Open tMinus or check your connection.</string>
+    <string name="widget_preview_alerts_row1_effect">Delay</string>
+    <string name="widget_preview_alerts_row1_header">Red Line: delays of up to 10 minutes due to a disabled train at Andrew.</string>
+    <string name="widget_preview_alerts_row2_effect">Elevator Closure</string>
+    <string name="widget_preview_alerts_row2_header">Orange Line: the elevator to the Back Bay platform is out of service.</string>
     <string name="widget_alerts_configure_title">Service alerts widget</string>
     <string name="widget_alerts_lines_label">Lines to watch</string>
     <string name="widget_alerts_line_red">Red Line</string>

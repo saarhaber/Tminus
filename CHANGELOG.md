@@ -27,6 +27,9 @@ All notable changes to tMinus are recorded here. The format follows
   outages and fired on unrelated ones. They now use the API's stop filter.
 - Notification delivery markers accumulated in `SharedPreferences` forever.
 - Live widget updates did not resume after a reboot.
+- The favorite stops and service alerts widgets showed a bare loading spinner in the widget picker:
+  both declared the loading layout as their `previewLayout`. They now preview their real content —
+  station names, headsigns and countdowns for favorites, effect and alert text for alerts.
 
 ### Changed
 
