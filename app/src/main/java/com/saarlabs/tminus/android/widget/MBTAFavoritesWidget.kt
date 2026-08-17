@@ -229,7 +229,14 @@ private object FavoritesContent {
                         maxLines = 1,
                     )
                     Text(
-                        text = departure.departureTime.formattedTime(use24Hour),
+                        // Commuter rail publishes a track; the board next to it shows one, so a
+                        // favourite for the same station should not be the surface that hides it.
+                        text =
+                            clockWithTrack(
+                                context,
+                                departure.departureTime.formattedTime(use24Hour),
+                                departure.platform,
+                            ),
                         style =
                             TextStyle(
                                 color = ColorProvider(secondary),

@@ -161,7 +161,9 @@ internal object TripWidgetRapidTransitLayouts {
             railWidth = (4f * gapScalar).coerceIn(3f, 7f).dp,
             showTimeStrip = showTimeStrip,
             countdownBesideStops = countdownBesideStops,
-            showPlatforms = h >= 190f && w >= 240f,
+            // A track is short text and the strip already reserves a row for it; hiding it on
+            // anything under 5x4 cells meant most placements never showed one at all.
+            showPlatforms = h >= 150f && w >= 190f,
         )
     }
 
@@ -485,7 +487,7 @@ internal object TripWidgetRapidTransitLayouts {
         rowBackground: Color,
         m: Metrics,
     ) {
-        val platforms = platformText(context, tripData)
+        val platforms = tripTrackText(context, tripData)
         // Full-bleed footer band, mirroring the route band on top, so the times line up with the
         // stop names above instead of starting a few dp inside them.
         Row(
@@ -670,12 +672,4 @@ internal object TripWidgetRapidTransitLayouts {
         }
     }
 
-    /** Null when the trip has no platform information at either end. */
-    internal fun platformText(context: Context, tripData: WidgetTripData): String? {
-        val from = tripData.fromPlatform?.takeIf { it.isNotBlank() }
-        val to = tripData.toPlatform?.takeIf { it.isNotBlank() }
-        val parts =
-            listOfNotNull(from, to).map { context.getString(R.string.widget_track_short, it) }
-        return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
-    }
 }

@@ -137,20 +137,30 @@ internal class WidgetConfigStore(context: Context) {
         prefs.edit().putInt(KEY_PENDING_CONFIG_WIDGET_ID, appWidgetId).apply()
     }
 
-    fun takePendingTripConfigWidgetId(): Int = takePending(KEY_PENDING_CONFIG_WIDGET_ID)
+    fun peekPendingTripConfigWidgetId(): Int = peekPending(KEY_PENDING_CONFIG_WIDGET_ID)
+
+    fun clearPendingTripConfigWidgetId() {
+        prefs.edit().remove(KEY_PENDING_CONFIG_WIDGET_ID).apply()
+    }
 
     fun setPendingStationBoardConfigWidgetId(appWidgetId: Int) {
         prefs.edit().putInt(KEY_PENDING_STATION_BOARD_WIDGET_ID, appWidgetId).apply()
     }
 
-    fun takePendingStationBoardConfigWidgetId(): Int =
-        takePending(KEY_PENDING_STATION_BOARD_WIDGET_ID)
+    fun peekPendingStationBoardConfigWidgetId(): Int =
+        peekPending(KEY_PENDING_STATION_BOARD_WIDGET_ID)
 
-    private fun takePending(key: String): Int {
-        val id = prefs.getInt(key, AppWidgetManager.INVALID_APPWIDGET_ID)
-        prefs.edit().remove(key).apply()
-        return id
+    fun clearPendingStationBoardConfigWidgetId() {
+        prefs.edit().remove(KEY_PENDING_STATION_BOARD_WIDGET_ID).apply()
     }
+
+    /**
+     * Reads without consuming. Consuming on read meant a configuration activity that was recreated
+     * — a rotation is enough — found nothing the second time and closed itself, so the widget was
+     * never configured. The id is cleared once a configuration is actually saved.
+     */
+    private fun peekPending(key: String): Int =
+        prefs.getInt(key, AppWidgetManager.INVALID_APPWIDGET_ID)
 
     // --- internals ---
 

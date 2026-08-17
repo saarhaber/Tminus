@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget-picker preview (RemoteViews-safe subset). Avoid paddingHorizontal/paddingVertical (API 34+)
-  for inflation on older APIs, and avoid match_parent heights on Views inside wrap_content rows.
+  Widget-picker preview (RemoteViews-safe subset). Mirrors MBTAStationBoardWidget's board: header
+  band, then rows with the line-coloured rail, the full-width route banner, the destination and the
+  "3 min · 7:45 AM" schedule line. Avoid paddingHorizontal/paddingVertical (API 34+) for inflation
+  on older APIs, and give the rails an explicit height rather than match_parent inside a
+  wrap_content row.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -12,7 +15,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/widget_header"
+        android:background="@drawable/widget_preview_header_band"
         android:orientation="vertical"
         android:paddingLeft="12dp"
         android:paddingTop="10dp"
@@ -52,91 +55,117 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
-            android:background="@color/widget_row_bg"
-            android:orientation="vertical"
-            android:paddingLeft="10dp"
-            android:paddingTop="8dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="8dp">
+            android:background="@drawable/widget_preview_row"
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:paddingLeft="8dp"
+            android:paddingTop="6dp"
+            android:paddingRight="8dp"
+            android:paddingBottom="6dp">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/widget_preview_route_chip_red"
-                android:maxLines="2"
-                android:paddingLeft="8dp"
-                android:paddingTop="5dp"
-                android:paddingRight="8dp"
-                android:paddingBottom="5dp"
-                android:text="@string/widget_preview_sb_row1_route"
-                android:textColor="@android:color/white"
-                android:textSize="10sp"
-                android:textStyle="bold" />
+            <View
+                android:layout_width="4dp"
+                android:layout_height="52dp"
+                android:background="@drawable/widget_preview_accent_bar_red" />
 
-            <TextView
-                android:layout_width="match_parent"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:maxLines="3"
-                android:text="@string/widget_preview_sb_row1_dest"
-                android:textColor="@color/widget_on_surface"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:maxLines="2"
-                android:text="@string/widget_preview_sb_row1_times_line"
-                android:textColor="#DA291C"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/widget_preview_route_chip_red"
+                    android:maxLines="2"
+                    android:paddingLeft="8dp"
+                    android:paddingTop="5dp"
+                    android:paddingRight="8dp"
+                    android:paddingBottom="5dp"
+                    android:text="@string/widget_preview_sb_row1_route"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:maxLines="3"
+                    android:text="@string/widget_preview_sb_row1_dest"
+                    android:textColor="@color/widget_on_surface"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:maxLines="2"
+                    android:text="@string/widget_preview_sb_row1_times_line"
+                    android:textColor="#DA291C"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/widget_row_bg"
-            android:orientation="vertical"
-            android:paddingLeft="10dp"
-            android:paddingTop="8dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="8dp">
+            android:background="@drawable/widget_preview_row"
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:paddingLeft="8dp"
+            android:paddingTop="6dp"
+            android:paddingRight="8dp"
+            android:paddingBottom="6dp">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/widget_preview_route_chip_green"
-                android:maxLines="2"
-                android:paddingLeft="8dp"
-                android:paddingTop="5dp"
-                android:paddingRight="8dp"
-                android:paddingBottom="5dp"
-                android:text="@string/widget_preview_sb_row2_route"
-                android:textColor="@android:color/white"
-                android:textSize="10sp"
-                android:textStyle="bold" />
+            <View
+                android:layout_width="4dp"
+                android:layout_height="52dp"
+                android:background="@drawable/widget_preview_accent_bar_green" />
 
-            <TextView
-                android:layout_width="match_parent"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:maxLines="3"
-                android:text="@string/widget_preview_sb_row2_dest"
-                android:textColor="@color/widget_on_surface"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:maxLines="2"
-                android:text="@string/widget_preview_sb_row2_times_line"
-                android:textColor="#00843D"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/widget_preview_route_chip_green"
+                    android:maxLines="2"
+                    android:paddingLeft="8dp"
+                    android:paddingTop="5dp"
+                    android:paddingRight="8dp"
+                    android:paddingBottom="5dp"
+                    android:text="@string/widget_preview_sb_row2_route"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:maxLines="3"
+                    android:text="@string/widget_preview_sb_row2_dest"
+                    android:textColor="@color/widget_on_surface"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:maxLines="2"
+                    android:text="@string/widget_preview_sb_row2_times_line"
+                    android:textColor="#00843D"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

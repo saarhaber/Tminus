@@ -197,6 +197,7 @@
     <string name="widget_now">now</string>
     <string name="widget_refresh_short">Refresh</string>
     <string name="widget_track_short">Track %1$s</string>
+    <string name="widget_clock_with_track">%1$s · %2$s</string>
     <string name="widget_train">Train %1$s</string>
     <string name="widget_mbta_mark_content_description">MBTA</string>
     <string name="widget_trip_route_type_commuter">Commuter Rail</string>
@@ -229,8 +230,8 @@
     <string name="widget_preview_sb_row2_dest">Heath St</string>
     <string name="widget_preview_sb_row2_clock">7:48 AM</string>
     <string name="widget_preview_sb_row2_min">in 6 min</string>
-    <string name="widget_preview_sb_row1_times_line">in 3 min · 7:45 AM</string>
-    <string name="widget_preview_sb_row2_times_line">in 6 min · 7:48 AM</string>
+    <string name="widget_preview_sb_row1_times_line">3 min · 7:45 AM</string>
+    <string name="widget_preview_sb_row2_times_line">6 min · 7:48 AM</string>
     <string name="widget_station_board_select_stop_placeholder">Search stops</string>
     <string name="widget_station_board_selecting_stop">Station</string>
     <string name="widget_station_board_route_section">Line filter</string>
@@ -298,10 +299,10 @@
     <string name="widget_preview_fav_row1_headsign">Ashmont</string>
     <string name="widget_preview_fav_row1_min">3 min</string>
     <string name="widget_preview_fav_row1_clock">7:45 AM</string>
-    <string name="widget_preview_fav_row2_stop">Back Bay</string>
-    <string name="widget_preview_fav_row2_headsign">Forest Hills</string>
-    <string name="widget_preview_fav_row2_min">8 min</string>
-    <string name="widget_preview_fav_row2_clock">7:52 AM</string>
+    <string name="widget_preview_fav_row2_stop">Natick Center</string>
+    <string name="widget_preview_fav_row2_headsign">South Station</string>
+    <string name="widget_preview_fav_row2_min">12 min</string>
+    <string name="widget_preview_fav_row2_clock">7:52 AM · Track 2</string>
     <string name="widget_favorites_configure_title">Favorite stops widget</string>
     <string name="widget_favorites_count_label">Stops to show</string>
     <string name="widget_favorites_sort_soonest">Show soonest departures first</string>

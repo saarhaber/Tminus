@@ -27,14 +27,13 @@
             android:maxLines="1"
             android:text="@string/widget_favorites_label"
             android:textColor="@color/widget_on_header"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:alpha="0.82"
             android:maxLines="1"
             android:text="@string/widget_favorites_subtitle"
             android:textColor="@color/widget_on_header"
@@ -134,7 +133,7 @@
             <View
                 android:layout_width="4dp"
                 android:layout_height="30dp"
-                android:background="@drawable/widget_preview_accent_bar_orange" />
+                android:background="@drawable/widget_preview_accent_bar_cr" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -173,7 +172,7 @@
                     android:layout_height="wrap_content"
                     android:maxLines="1"
                     android:text="@string/widget_preview_fav_row2_min"
-                    android:textColor="#ED8B00"
+                    android:textColor="#80276D"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 

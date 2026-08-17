@@ -30,6 +30,21 @@ All notable changes to tMinus are recorded here. The format follows
 - The favorite stops and service alerts widgets showed a bare loading spinner in the widget picker:
   both declared the loading layout as their `previewLayout`. They now preview their real content —
   station names, headsigns and countdowns for favorites, effect and alert text for alerts.
+- The station board's picker preview had drifted from the widget: no line-coloured rail, square row
+  corners, and a schedule line reading "in 3 min" where the widget renders "3 min".
+- Track numbers were missing everywhere except the station board. The commuter rail trip widget —
+  the only mode MBTA publishes a track for — never drew one at all; the favorite stops widget
+  dropped the track it had already fetched; and the subway trip layout hid it below 5x4 cells.
+  The trip widget now shows both ends' tracks (once, when they are the same), and the boards append
+  the track to the departure's clock time.
+- Configuring a widget could leave it on "Tap to set up" while a different widget picked up the
+  configuration. When a launcher starts the configuration activity without `EXTRA_APPWIDGET_ID`,
+  the id recorded by the waiting widget is now only trusted if it still names a placed, unconfigured
+  widget; otherwise the single unconfigured widget of that provider is used. The recorded id is also
+  no longer consumed on read, which had made a rotation mid-setup close the activity with nothing
+  saved.
+- Home's station cards truncated the destination to "Wor…" when the route name was long, because
+  the route chip and the destination shared one line. The chip now sits above the destination.
 
 ### Changed
 

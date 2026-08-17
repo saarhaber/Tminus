@@ -589,10 +589,7 @@ private object StationBoardContent {
                 context.getString(R.string.widget_min_short, departure.minutesUntil)
             }
         val clockText = departure.departureTime.formattedTime(use24Hour)
-        val clockLine =
-            departure.platform?.let { plat ->
-                "${clockText} · ${context.getString(R.string.widget_track_short, plat)}"
-            } ?: clockText
+        val clockLine = clockWithTrack(context, clockText, departure.platform)
 
         Row(
             modifier =

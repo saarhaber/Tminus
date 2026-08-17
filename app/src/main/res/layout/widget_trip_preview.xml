@@ -103,17 +103,16 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Full-bleed, like the widget's footer band: inset here and the times no longer line up
+         with the stop names above them. -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="8dp"
-        android:layout_marginRight="8dp"
-        android:layout_marginBottom="8dp"
         android:background="@drawable/widget_preview_trip_strip"
         android:maxLines="1"
-        android:paddingLeft="12dp"
+        android:paddingLeft="14dp"
         android:paddingTop="7dp"
-        android:paddingRight="12dp"
+        android:paddingRight="14dp"
         android:paddingBottom="7dp"
         android:text="@string/widget_preview_trip_times"
         android:textColor="@color/key"

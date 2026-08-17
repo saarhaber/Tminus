@@ -24,13 +24,17 @@ public class WidgetConfigActivity : ComponentActivity() {
 
         val store = WidgetConfigStore(applicationContext)
         val appWidgetId =
-            intent
-                ?.getIntExtra(
-                    AppWidgetManager.EXTRA_APPWIDGET_ID,
-                    AppWidgetManager.INVALID_APPWIDGET_ID,
-                )
-                ?.takeIf { it != AppWidgetManager.INVALID_APPWIDGET_ID }
-                ?: store.takePendingTripConfigWidgetId()
+            resolveConfigTargetId(
+                intentId =
+                    intent?.getIntExtra(
+                        AppWidgetManager.EXTRA_APPWIDGET_ID,
+                        AppWidgetManager.INVALID_APPWIDGET_ID,
+                    )
+                        ?: AppWidgetManager.INVALID_APPWIDGET_ID,
+                pendingId = store.peekPendingTripConfigWidgetId(),
+                placedIds = placedWidgetIds(this, MBTATripWidgetReceiver::class.java),
+                isConfigured = { store.tripConfig(it) != null },
+            )
 
         // Until the user confirms, the launcher must treat this as cancelled — otherwise backing
         // out leaves an unconfigured widget on the home screen.
@@ -76,6 +80,7 @@ public class WidgetConfigActivity : ComponentActivity() {
      * Glance session already picked the save up. This covers the case where no session is running.
      */
     private fun finishConfigured(appWidgetId: Int) {
+        WidgetConfigStore(applicationContext).clearPendingTripConfigWidgetId()
         setResult(
             RESULT_OK,
             Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
