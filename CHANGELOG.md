@@ -30,6 +30,12 @@ All notable changes to tMinus are recorded here. The format follows
 
 ### Changed
 
+- The next trip widget (subway, bus and ferry) was relaid out. "min" now sits on the countdown's
+  baseline instead of on the body's next line, where it drifted away from its own digits as the
+  widget grew; the departure and arrival times moved into a footer band that lines up with the stop
+  names; and the widget picks between three layouts by size — countdown stacked above the stops,
+  countdown beside them when the widget is wide, and a single row when it is one cell tall. Type is
+  fitted to the space that is actually left, so the countdown is no longer clipped by the footer.
 - Stop search ranks results: exact, then prefix, then word-start, then substring, with rail stations
   ahead of bus stops. Searching "Park" now returns Park Street first.
 - Home leads with the next departures from starred stations.

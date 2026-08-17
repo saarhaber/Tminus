@@ -32,12 +32,18 @@ configuration as you drop it, and each recomputes its countdown locally between 
 
 | | |
 | --- | --- |
-| <img src="screenshots/widget-next-trip.png" alt="Next trip widget: Red Line to Braintree, 5 min, Davis to Park Street" width="330" /><br />**Next trip** — the next scheduled trip between two stops. Big countdown, line colour, and the from → to pair. | <img src="screenshots/widget-favorite-stops.png" alt="Favorite stops widget listing Davis, Park Street and Alewife with next departures" width="330" /><br />**Favorite stops** — the next departure from each starred stop. Show 3, 5 or 8, optionally sorted by soonest. |
+| <img src="screenshots/widget-next-trip.png" alt="Next trip widget: Red Line to Ashmont, 2 min, Davis to Park Street, departing 10:03 AM" width="330" /><br />**Next trip** — the next scheduled trip between two stops. Big countdown, line colour, and the from → to pair. | <img src="screenshots/widget-favorite-stops.png" alt="Favorite stops widget listing Davis, Park Street and Alewife with next departures" width="330" /><br />**Favorite stops** — the next departure from each starred stop. Show 3, 5 or 8, optionally sorted by soonest. |
 | <img src="screenshots/widget-station-board.png" alt="Station board widget for Park Street showing three upcoming Red Line departures" width="330" /><br />**Station board** — a departure board for one stop, optionally filtered to a single line. | <img src="screenshots/widget-service-alerts.png" alt="Service alerts widget showing a station issue and an Orange Line suspension" width="330" /><br />**Service alerts** — active alerts on the lines you pick, with the effect named up front. |
 
-On the home screen together:
+Widgets are resizable, and the next trip widget re-lays itself out rather than just scaling: stack
+the countdown above the stops when the widget is roughly square, put it beside them when it is wide,
+and fall back to a single row when it is only one cell tall.
 
-<img src="screenshots/widgets-on-home-screen.png" alt="tMinus next trip and favorite stops widgets on an Android home screen" width="300" />
+<img src="screenshots/widget-next-trip-wide.png" alt="Next trip widget stretched wide: 3 min beside Davis to Park Street, with the departure and arrival strip below" width="440" />
+
+On the home screen:
+
+<img src="screenshots/widgets-on-home-screen.png" alt="The tMinus next trip widget on an Android home screen" width="300" />
 
 Dropping a widget opens its configuration immediately — no trip to the app and back:
 

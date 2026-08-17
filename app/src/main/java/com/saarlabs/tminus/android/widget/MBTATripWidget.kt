@@ -28,14 +28,11 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
-import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
@@ -48,7 +45,6 @@ import com.saarlabs.tminus.ui.theme.readFontScale
 import com.saarlabs.tminus.ui.widgetTripStopDisplayLabel
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
-import com.saarlabs.tminus.android.util.formattedTime
 import com.saarlabs.tminus.android.util.colorFromHex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -113,19 +109,18 @@ private fun RememberPendingTripConfigId(context: Context, appWidgetId: Int) {
 
 private object WidgetContent {
 
+    /**
+     * Type and spacing for the message states (setup prompt, loading, errors). The trip itself is
+     * laid out by [TripWidgetRapidTransitLayouts] / [TripWidgetCommuterLayouts], which size their
+     * own text against the layout they pick.
+     */
     private data class WidgetTypography(
         val routeLabel: TextUnit,
-        val headsign: TextUnit,
         val stationName: TextUnit,
-        /** Large countdown digit(s), inline before the origin station name. */
-        val minutes: TextUnit,
-        val minutesUnit: TextUnit,
-        val bodyTime: TextUnit,
         val caption: TextUnit,
         val padding: Dp,
         val gapSmall: Dp,
         val gapMedium: Dp,
-        val pillCorner: Dp,
     )
 
     @Composable
@@ -147,29 +142,13 @@ private object WidgetContent {
         val gapScalar = (shortEdge / refShort).coerceIn(0.42f, 2.6f)
         val narrowWidth = w < 340f
         val routeHeaderShrink = if (narrowWidth) 0.88f else 1f
-        val padding = (14f * viewportScale).coerceIn(6f, 24f).dp
-        val routeLabel = (12f * scale * routeHeaderShrink).coerceIn(6f, 20f).sp
-        val headsign = (12f * scale * routeHeaderShrink).coerceIn(6f, 20f).sp
-        val stationName = (13f * scale * if (narrowWidth) 0.92f else 1f).coerceIn(8f, 24f).sp
-        val minutes = (34f * scale).coerceIn(13f, 72f).sp
-        val minutesUnit = (12f * scale).coerceIn(6f, 21f).sp
-        val bodyTime = (12f * scale * if (narrowWidth) 0.92f else 1f).coerceIn(7f, 20f).sp
-        val caption = (10f * scale * if (narrowWidth) 0.92f else 1f).coerceIn(6f, 17f).sp
-        val gapSmall = (4f * gapScalar).coerceIn(2f, 11f).dp
-        val gapMedium = (8f * gapScalar).coerceIn(3f, 15f).dp
-        val pillCorner = (14f * gapScalar).coerceIn(8f, 22f).dp
         return WidgetTypography(
-            routeLabel = routeLabel,
-            headsign = headsign,
-            stationName = stationName,
-            minutes = minutes,
-            minutesUnit = minutesUnit,
-            bodyTime = bodyTime,
-            caption = caption,
-            padding = padding,
-            gapSmall = gapSmall,
-            gapMedium = gapMedium,
-            pillCorner = pillCorner,
+            routeLabel = (12f * scale * routeHeaderShrink).coerceIn(6f, 20f).sp,
+            stationName = (13f * scale * if (narrowWidth) 0.92f else 1f).coerceIn(8f, 24f).sp,
+            caption = (10f * scale * if (narrowWidth) 0.92f else 1f).coerceIn(6f, 17f).sp,
+            padding = (14f * viewportScale).coerceIn(6f, 24f).dp,
+            gapSmall = (4f * gapScalar).coerceIn(2f, 11f).dp,
+            gapMedium = (8f * gapScalar).coerceIn(3f, 15f).dp,
         )
     }
 
@@ -425,12 +404,7 @@ private object WidgetContent {
             runCatching { colorFromHex(tripData.route.color) }.getOrElse { fallback }
         val routeTextColor =
             runCatching { colorFromHex(tripData.route.textColor) }.getOrElse { Color.White }
-        val trainLabel =
-            tripData.headsign?.takeIf { it.isNotBlank() }
-                ?: context.getString(R.string.widget_train, tripData.tripId)
-
         GlanceTheme {
-            val t = typography(fontScale)
             val baseSurface =
                 GlanceModifier.fillMaxSize()
                     .cornerRadius(24.dp)
@@ -453,148 +427,20 @@ private object WidgetContent {
                             .background(Color(0x00000000)),
                 )
             } else {
-                Column(
-                    modifier = baseSurface.background(surface(context)),
-                ) {
-                    Row(
-                        modifier =
-                            GlanceModifier.fillMaxWidth()
-                                .background(routeColor)
-                                .padding(horizontal = t.padding, vertical = t.gapMedium),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = tripData.route.label,
-                            modifier = GlanceModifier.defaultWeight(),
-                            style =
-                                TextStyle(
-                                    color = ColorProvider(routeTextColor),
-                                    fontSize = t.routeLabel,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Start,
-                                ),
-                            maxLines = 2,
-                        )
-                        Spacer(modifier = GlanceModifier.width(t.gapMedium))
-                        Text(
-                            text = trainLabel,
-                            style =
-                                TextStyle(
-                                    color = ColorProvider(routeTextColor.copy(alpha = 0.85f)),
-                                    fontSize = t.headsign,
-                                    textAlign = TextAlign.End,
-                                ),
-                            maxLines = 2,
-                        )
-                    }
-
-                    Row(
-                        modifier =
-                            GlanceModifier.fillMaxWidth()
-                                .fillMaxHeight()
-                                .padding(horizontal = t.padding, vertical = t.gapMedium),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = GlanceModifier.fillMaxWidth()) {
-                            val minutesStr = tripData.minutesUntil.coerceAtLeast(0).toString()
-                            Row(
-                                modifier = GlanceModifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = minutesStr,
-                                    style =
-                                        TextStyle(
-                                            color = ColorProvider(routeColor),
-                                            fontSize = t.minutes,
-                                            fontWeight = FontWeight.Bold,
-                                            textAlign = TextAlign.Start,
-                                        ),
-                                    maxLines = 1,
-                                )
-                                Spacer(modifier = GlanceModifier.width(t.gapSmall))
-                                Text(
-                                    text = fromLabel,
-                                    modifier = GlanceModifier.defaultWeight(),
-                                    style =
-                                        TextStyle(
-                                            color = ColorProvider(onSurface(context)),
-                                            fontSize = t.stationName,
-                                            fontWeight = FontWeight.Medium,
-                                            textAlign = TextAlign.Start,
-                                        ),
-                                    maxLines = 2,
-                                )
-                            }
-                            Spacer(modifier = GlanceModifier.height(t.gapSmall))
-                            Row(
-                                modifier = GlanceModifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = context.getString(R.string.widget_min_unit),
-                                    style =
-                                        TextStyle(
-                                            color = ColorProvider(onSurfaceVariant(context)),
-                                            fontSize = t.minutesUnit,
-                                            fontWeight = FontWeight.Normal,
-                                            textAlign = TextAlign.Start,
-                                        ),
-                                    maxLines = 1,
-                                )
-                                Spacer(modifier = GlanceModifier.width(t.gapSmall))
-                                Text(
-                                    text = "→ $toLabel",
-                                    modifier = GlanceModifier.defaultWeight(),
-                                    style =
-                                        TextStyle(
-                                            color = ColorProvider(onSurface(context)),
-                                            fontSize = t.stationName,
-                                            fontWeight = FontWeight.Medium,
-                                            textAlign = TextAlign.Start,
-                                        ),
-                                    maxLines = 2,
-                                )
-                            }
-                            Spacer(modifier = GlanceModifier.height(t.gapSmall))
-                            Text(
-                                text =
-                                    "${tripData.departureTime.formattedTime(use24Hour)} → ${tripData.arrivalTime.formattedTime(use24Hour)}",
-                                modifier = GlanceModifier.fillMaxWidth(),
-                                style =
-                                    TextStyle(
-                                        color = ColorProvider(onSurfaceVariant(context)),
-                                        fontSize = t.bodyTime,
-                                    ),
-                                maxLines = 2,
-                            )
-                            if (tripData.fromPlatform != null || tripData.toPlatform != null) {
-                                val platformText = buildString {
-                                    tripData.fromPlatform?.let {
-                                        append(context.getString(R.string.widget_track_short, it))
-                                    }
-                                    if (tripData.fromPlatform != null && tripData.toPlatform != null)
-                                        append(" • ")
-                                    tripData.toPlatform?.let {
-                                        append(context.getString(R.string.widget_track_short, it))
-                                    }
-                                }
-                                if (platformText.isNotEmpty()) {
-                                    Text(
-                                        text = platformText,
-                                        modifier = GlanceModifier.fillMaxWidth(),
-                                        style =
-                                            TextStyle(
-                                                color = ColorProvider(onSurfaceVariant(context)),
-                                                fontSize = t.caption,
-                                            ),
-                                        maxLines = 2,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                TripWidgetRapidTransitLayouts.RapidTransitTrip(
+                    context = context,
+                    tripData = tripData,
+                    fromLabel = fromLabel,
+                    toLabel = toLabel,
+                    routeColor = routeColor,
+                    routeTextColor = routeTextColor,
+                    onSurface = onSurface(context),
+                    onSurfaceVariant = onSurfaceVariant(context),
+                    rowBackground = rowBg(context),
+                    use24Hour = use24Hour,
+                    fontScale = fontScale,
+                    surfaceModifier = baseSurface.background(surface(context)),
+                )
             }
         }
     }
