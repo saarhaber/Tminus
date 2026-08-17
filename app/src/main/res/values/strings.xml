@@ -166,15 +166,12 @@
 
     <string name="widget_trip_label">Next trip</string>
     <string name="widget_trip_description">Next scheduled trip between two stops, with countdown and departure or arrival times.</string>
-    <string name="widget_preview_route_name_cr">CR</string>
-    <string name="widget_preview_train_headsign">Inbound</string>
-    <string name="widget_preview_from_to">Natick Center → Back Bay</string>
-    <string name="widget_preview_from_stop_inline">Natick Center</string>
-    <string name="widget_preview_to_stop_arrow">→ Back Bay</string>
-    <string name="widget_preview_tracks_sample">Track 2 • Track 5</string>
-    <string name="widget_preview_in_minutes_sample">in 12 min</string>
-    <string name="widget_preview_times">7:42 AM → 8:18 AM</string>
-    <string name="widget_preview_trip_minutes_digit">12</string>
+    <string name="widget_preview_trip_route">Red Line</string>
+    <string name="widget_preview_trip_headsign">Ashmont</string>
+    <string name="widget_preview_trip_minutes_digit">4</string>
+    <string name="widget_preview_trip_from">Davis</string>
+    <string name="widget_preview_trip_to_arrow">→ Park Street</string>
+    <string name="widget_preview_trip_times">7:42 → 7:58</string>
     <string name="widget_configure_title">Configure Trip Widget</string>
     <string name="widget_from">From</string>
     <string name="widget_to">To</string>
@@ -208,6 +205,10 @@
     <string name="widget_trip_next_train_arrives">Next Train %1$s · arr %2$s</string>
     <string name="widget_trip_next_to_destination">Next: %1$s %2$s</string>
     <string name="widget_trip_next_time_only">Next: %1$s</string>
+    <string name="widget_trip_to_arrow">→ %1$s</string>
+    <string name="widget_trip_from_to">%1$s → %2$s</string>
+    <string name="widget_trip_time_range">%1$s → %2$s</string>
+    <string name="widget_trip_departs_at">Departs %1$s</string>
 
     <string name="widget_station_board_label">Station board</string>
     <string name="widget_station_board_description">Upcoming scheduled departures at one stop, with line colors and countdown.</string>
