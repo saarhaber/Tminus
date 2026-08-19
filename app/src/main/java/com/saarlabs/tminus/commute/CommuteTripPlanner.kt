@@ -16,10 +16,16 @@ import kotlinx.datetime.LocalDate
 internal object CommuteTripPlanner {
 
     /**
-     * Next trip whose departure is in the commute time-of-day window, on or after [now], on a weekday
-     * in [selectedDaysOfWeek] (1 = Mon … 7 = Sun). Uses actual timestamps from [response] (any service dates
-     * the API returns), not synthetic calendar windows — so it matches evening previews against tomorrow’s
-     * schedules. If [selectedDaysOfWeek] is empty, any weekday is allowed.
+     * Next trip whose departure is in the commute time-of-day window, still catchable with
+     * [leadMinutes] notice, on a weekday in [selectedDaysOfWeek] (1 = Mon … 7 = Sun). Uses actual
+     * timestamps from [response] (any service dates the API returns), not synthetic calendar
+     * windows — so it matches evening previews against tomorrow’s schedules. If
+     * [selectedDaysOfWeek] is empty, any weekday is allowed.
+     *
+     * The lead belongs here for the same reason it belongs in [findNextTripInWindow]: the preview
+     * exists to show the user which train their commute is about, and it is only telling the truth
+     * if it picks the train the alert would pick. Without the lead, a frequent route showed the
+     * soonest departure and an "approx. leave by" that had already passed.
      */
     fun findNextCommutePreviewTrip(
         response: ScheduleResponse,
@@ -30,6 +36,7 @@ internal object CommuteTripPlanner {
         windowStartMinutesFromMidnight: Int,
         windowEndMinutesFromMidnight: Int,
         selectedDaysOfWeek: Set<Int>,
+        leadMinutes: Int,
     ): WidgetTripData? {
         val stops = globalData.stops
         val allowed = if (selectedDaysOfWeek.isEmpty()) (1..7).toSet() else selectedDaysOfWeek
@@ -48,14 +55,26 @@ internal object CommuteTripPlanner {
                     .map { toSchedule -> fromSchedule to toSchedule }
             }
 
+        // `windowStart = now` because the time-of-day window is applied per departure below, not as
+        // an instant; what is shared with the notification path is the lead bound itself.
+        val lower =
+            commuteDepartureLowerBound(
+                now = now,
+                windowStart = now,
+                leadMinutes = leadMinutes,
+            )
+
         val nextTrip =
             tripPairs
                 .filter { (from, _) ->
                     val depTime = from.departureTime ?: from.arrivalTime ?: return@filter false
-                    if (depTime < now) return@filter false
-                    if (isoDayOfWeek(depTime.local.date) !in allowed) return@filter false
-                    val depMin = depTime.local.hour * 60 + depTime.local.minute
-                    depMin in windowStartMinutesFromMidnight..windowEndMinutesFromMidnight
+                    isEligiblePreviewDeparture(
+                        departure = depTime,
+                        lowerBound = lower,
+                        windowStartMinutesFromMidnight = windowStartMinutesFromMidnight,
+                        windowEndMinutesFromMidnight = windowEndMinutesFromMidnight,
+                        allowedDaysOfWeek = allowed,
+                    )
                 }
                 .minByOrNull { (from, _) ->
                     val depTime = from.departureTime ?: from.arrivalTime!!
@@ -185,15 +204,36 @@ internal object CommuteTripPlanner {
         )
     }
 
-    /** 1 = Monday … 7 = Sunday (matches commute day chips). */
-    private fun isoDayOfWeek(date: LocalDate): Int =
-        when (date.dayOfWeek) {
-            DayOfWeek.MONDAY -> 1
-            DayOfWeek.TUESDAY -> 2
-            DayOfWeek.WEDNESDAY -> 3
-            DayOfWeek.THURSDAY -> 4
-            DayOfWeek.FRIDAY -> 5
-            DayOfWeek.SATURDAY -> 6
-            DayOfWeek.SUNDAY -> 7
-        }
 }
+
+/**
+ * Whether the preview may show a departure at [departure].
+ *
+ * Three rules, in the order they cost the least to check: it has to be one the user can still make
+ * with their notification lead ([lowerBound], from [commuteDepartureLowerBound]), on a day the
+ * commute runs, at a time of day inside the commute window.
+ */
+internal fun isEligiblePreviewDeparture(
+    departure: EasternTimeInstant,
+    lowerBound: EasternTimeInstant,
+    windowStartMinutesFromMidnight: Int,
+    windowEndMinutesFromMidnight: Int,
+    allowedDaysOfWeek: Set<Int>,
+): Boolean {
+    if (departure < lowerBound) return false
+    if (isoDayOfWeek(departure.local.date) !in allowedDaysOfWeek) return false
+    val depMin = departure.local.hour * 60 + departure.local.minute
+    return depMin in windowStartMinutesFromMidnight..windowEndMinutesFromMidnight
+}
+
+/** 1 = Monday … 7 = Sunday (matches commute day chips). */
+private fun isoDayOfWeek(date: LocalDate): Int =
+    when (date.dayOfWeek) {
+        DayOfWeek.MONDAY -> 1
+        DayOfWeek.TUESDAY -> 2
+        DayOfWeek.WEDNESDAY -> 3
+        DayOfWeek.THURSDAY -> 4
+        DayOfWeek.FRIDAY -> 5
+        DayOfWeek.SATURDAY -> 6
+        DayOfWeek.SUNDAY -> 7
+    }

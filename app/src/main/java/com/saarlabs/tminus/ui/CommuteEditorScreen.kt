@@ -353,6 +353,10 @@ public fun CommuteEditorScreen(
                         (global.stopIdsForScheduleFilter(f) + global.stopIdsForScheduleFilter(t))
                             .distinct()
                     val now = EasternTimeInstant.now()
+                    // Parsed before the search, not just for the displayed leave time: the lead
+                    // decides which train the preview is about, so that the sample matches the
+                    // train the commute alert would pick.
+                    val lead = leadMin.toIntOrNull()?.coerceIn(1, 120) ?: 12
                     val today = now.local.date
                     val allowedDays = if (days.isEmpty()) (1..7).toSet() else days
                     var trip: WidgetTripData? = null
@@ -384,12 +388,12 @@ public fun CommuteEditorScreen(
                                         windowStart,
                                         windowEnd,
                                         days,
+                                        lead,
                                     )
                                 if (trip != null) break
                             }
                         }
                     }
-                    val lead = leadMin.toIntOrNull()?.coerceIn(1, 120) ?: 12
                     previewText =
                         if (trip != null) {
                             val leave = trip.departureTime.minus(lead.minutes)

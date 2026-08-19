@@ -184,6 +184,7 @@ class CommuteTripPlannerTest {
                 windowStartMinutesFromMidnight = 7 * 60,
                 windowEndMinutesFromMidnight = 9 * 60,
                 selectedDaysOfWeek = setOf(2),
+                leadMinutes = 0,
             )
         assertEquals("tue", assertNotNull(tuesdayOnly).tripId)
     }
@@ -211,6 +212,7 @@ class CommuteTripPlannerTest {
                 windowStartMinutesFromMidnight = 8 * 60,
                 windowEndMinutesFromMidnight = 9 * 60,
                 selectedDaysOfWeek = emptySet(),
+                leadMinutes = 0,
             )
         assertEquals("inWindow", assertNotNull(tripData).tripId)
     }
@@ -339,5 +341,106 @@ class CommuteTripPlannerTest {
                 "alert for a worker starting at $start gave $notice min notice, not ~$lead",
             )
         }
+    }
+
+    private fun preview(
+        resp: ScheduleResponse,
+        now: EasternTimeInstant,
+        leadMinutes: Int,
+        windowStartMinutes: Int = 15 * 60,
+        windowEndMinutes: Int = 17 * 60,
+    ) =
+        CommuteTripPlanner.findNextCommutePreviewTrip(
+            response = resp,
+            globalData = globalData,
+            fromStopId = "from",
+            toStopId = "to",
+            now = now,
+            windowStartMinutesFromMidnight = windowStartMinutes,
+            windowEndMinutesFromMidnight = windowEndMinutes,
+            selectedDaysOfWeek = emptySet(),
+            leadMinutes = leadMinutes,
+        )
+
+    @Test
+    fun previewSkipsDeparturesTooSoonToReachAtTheChosenLead() {
+        // The reported failure: a 4:20 PM preview of a 5-minute headway showed the 4:22 departure
+        // and a "leave by" of 4:10, twelve minutes before the user was even looking at it.
+        val resp = frequentService(at(16, 0), count = 12, everyMinutes = 5)
+        val lead = 12
+        val tripData = assertNotNull(preview(resp, now = at(16, 20), leadMinutes = lead))
+        assertEquals(at(16, 30), tripData.departureTime)
+        val leaveAt = tripData.departureTime - lead.minutes
+        assertTrue(
+            leaveAt >= at(16, 20) - LEAVE_ALERT_WINDOW_MINUTES.minutes,
+            "preview offered a leave time of $leaveAt, well before 16:20",
+        )
+    }
+
+    @Test
+    fun previewKeepsATrainWhoseLeaveTimeHasJustPassed() {
+        // Exactly the grace boundary: the 8:10 train's leave time was 7:58 and its alert is still
+        // postable at 8:03, so the preview must still be about that train and not the next one.
+        val resp = frequentService(at(8, 0), count = 12, everyMinutes = 5)
+        val tripData =
+            assertNotNull(
+                preview(
+                    resp,
+                    now = at(8, 3),
+                    leadMinutes = 12,
+                    windowStartMinutes = 7 * 60,
+                    windowEndMinutes = 9 * 60,
+                ),
+            )
+        assertEquals(at(8, 10), tripData.departureTime)
+    }
+
+    @Test
+    fun previewNamesTheSameTrainTheAlertWould() {
+        // The point of the change: the editor's sample and the notification are about one train.
+        val lead = 12
+        val resp = frequentService(at(7, 30), count = 25, everyMinutes = 5)
+        var now = at(7, 30)
+        while (now <= at(8, 45)) {
+            val previewed =
+                preview(
+                    resp,
+                    now = now,
+                    leadMinutes = lead,
+                    windowStartMinutes = 7 * 60 + 45,
+                    windowEndMinutes = 8 * 60 + 45,
+                )
+            val alerted =
+                CommuteTripPlanner.findNextTripInWindow(
+                    response = resp,
+                    globalData = globalData,
+                    fromStopId = "from",
+                    toStopId = "to",
+                    now = now,
+                    windowStart = at(7, 45),
+                    windowEnd = at(8, 45),
+                    leadMinutes = lead,
+                )
+            assertEquals(
+                alerted?.tripId,
+                previewed?.tripId,
+                "preview and alert disagreed about the train at $now",
+            )
+            now += 1.minutes
+        }
+    }
+
+    @Test
+    fun previewShowsNothingWhenNoTrainIsLeftToCatch() {
+        val resp = frequentService(at(8, 0), count = 3, everyMinutes = 5)
+        assertNull(
+            preview(
+                resp,
+                now = at(8, 5),
+                leadMinutes = 30,
+                windowStartMinutes = 7 * 60,
+                windowEndMinutes = 9 * 60,
+            ),
+        )
     }
 }
