@@ -3,7 +3,6 @@ package com.saarlabs.tminus.commute.worker
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
 import com.saarlabs.tminus.R
 
 /**
@@ -21,7 +20,6 @@ internal object TminusNotificationChannels {
     const val ACCESSIBILITY = "accessibility_v1"
 
     fun ensureChannels(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannels(
             listOf(
