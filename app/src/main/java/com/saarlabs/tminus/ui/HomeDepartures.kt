@@ -177,6 +177,8 @@ private fun DepartureRow(departure: WidgetStationBoardDeparture, use24Hour: Bool
             stringResource(R.string.widget_min_short, departure.minutesUntil)
         }
     val clock = departure.departureTime.formatClock(use24Hour)
+    val track = departure.platform?.let { stringResource(R.string.widget_track_short, it) }
+    val clockLine = track?.let { "$clock · $it" } ?: clock
 
     Row(
         modifier =
@@ -184,33 +186,40 @@ private fun DepartureRow(departure: WidgetStationBoardDeparture, use24Hour: Bool
                 .fillMaxWidth()
                 .semantics(mergeDescendants = true) {
                     contentDescription =
-                        "${departure.route.label} to ${departure.headsign}, $minutesText, $clock"
+                        "${departure.route.label} to ${departure.headsign}, $minutesText, $clockLine"
                 },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(routeColor)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-        ) {
+        // The chip and the destination share a column rather than a row. Side by side, a full route
+        // name ("Framingham / Worcester Line") took most of the width and left the destination as
+        // "Wor…" — the one word on the line the rider is actually reading.
+        Column(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(routeColor)
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = departure.route.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = routeTextColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = departure.route.label,
-                style = MaterialTheme.typography.labelSmall,
-                color = routeTextColor,
-                maxLines = 1,
+                text = departure.headsign,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = departure.headsign,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = minutesText,
@@ -219,7 +228,7 @@ private fun DepartureRow(departure: WidgetStationBoardDeparture, use24Hour: Bool
                 maxLines = 1,
             )
             Text(
-                text = clock,
+                text = clockLine,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Widget-picker preview (RemoteViews-safe subset). Mirrors MBTAStationBoardWidget's board: header
-  band, then rows with the line-coloured rail, the full-width route banner, the destination and the
-  "3 min · 7:45 AM" schedule line. Avoid paddingHorizontal/paddingVertical (API 34+) for inflation
-  on older APIs, and give the rails an explicit height rather than match_parent inside a
-  wrap_content row.
+  Widget-picker preview (RemoteViews-safe subset). Mirrors MBTAFavoritesWidget's board: header band,
+  then one row per favorite stop — accent bar, station name over headsign, countdown over clock.
+  Avoid paddingHorizontal/paddingVertical (API 34+) so this still inflates on older APIs, and give
+  the accent bars an explicit height instead of match_parent inside a wrap_content row.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -18,26 +17,25 @@
         android:background="@drawable/widget_preview_header_band"
         android:orientation="vertical"
         android:paddingLeft="12dp"
-        android:paddingTop="10dp"
+        android:paddingTop="8dp"
         android:paddingRight="12dp"
-        android:paddingBottom="10dp">
+        android:paddingBottom="8dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:maxLines="2"
-            android:text="@string/widget_preview_station_board_station"
+            android:maxLines="1"
+            android:text="@string/widget_favorites_label"
             android:textColor="@color/widget_on_header"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:alpha="0.82"
-            android:maxLines="2"
-            android:text="@string/widget_station_board_scheduled_subtitle"
+            android:layout_marginTop="2dp"
+            android:maxLines="1"
+            android:text="@string/widget_favorites_subtitle"
             android:textColor="@color/widget_on_header"
             android:textSize="10sp" />
     </LinearLayout>
@@ -46,17 +44,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingLeft="10dp"
-        android:paddingTop="8dp"
-        android:paddingRight="10dp"
+        android:paddingLeft="12dp"
+        android:paddingTop="6dp"
+        android:paddingRight="12dp"
         android:paddingBottom="10dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp"
             android:background="@drawable/widget_preview_row"
             android:baselineAligned="false"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingLeft="8dp"
             android:paddingTop="6dp"
@@ -65,7 +63,7 @@
 
             <View
                 android:layout_width="4dp"
-                android:layout_height="52dp"
+                android:layout_height="30dp"
                 android:background="@drawable/widget_preview_accent_bar_red" />
 
             <LinearLayout
@@ -78,43 +76,54 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/widget_preview_route_chip_red"
-                    android:maxLines="2"
-                    android:paddingLeft="8dp"
-                    android:paddingTop="5dp"
-                    android:paddingRight="8dp"
-                    android:paddingBottom="5dp"
-                    android:text="@string/widget_preview_sb_row1_route"
-                    android:textColor="@android:color/white"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:maxLines="3"
-                    android:text="@string/widget_preview_sb_row1_dest"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row1_stop"
                     android:textColor="@color/widget_on_surface"
-                    android:textSize="11sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:maxLines="2"
-                    android:text="@string/widget_preview_sb_row1_times_line"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row1_headsign"
+                    android:textColor="@color/widget_on_surface_variant"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row1_min"
                     android:textColor="#DA291C"
-                    android:textSize="11sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row1_clock"
+                    android:textColor="@color/widget_on_surface_variant"
+                    android:textSize="10sp" />
             </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:background="@drawable/widget_preview_row"
             android:baselineAligned="false"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingLeft="8dp"
             android:paddingTop="6dp"
@@ -123,8 +132,8 @@
 
             <View
                 android:layout_width="4dp"
-                android:layout_height="52dp"
-                android:background="@drawable/widget_preview_accent_bar_green" />
+                android:layout_height="30dp"
+                android:background="@drawable/widget_preview_accent_bar_cr" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -136,35 +145,44 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/widget_preview_route_chip_green"
-                    android:maxLines="2"
-                    android:paddingLeft="8dp"
-                    android:paddingTop="5dp"
-                    android:paddingRight="8dp"
-                    android:paddingBottom="5dp"
-                    android:text="@string/widget_preview_sb_row2_route"
-                    android:textColor="@android:color/white"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:maxLines="3"
-                    android:text="@string/widget_preview_sb_row2_dest"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row2_stop"
                     android:textColor="@color/widget_on_surface"
-                    android:textSize="11sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:maxLines="2"
-                    android:text="@string/widget_preview_sb_row2_times_line"
-                    android:textColor="#00843D"
-                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row2_headsign"
+                    android:textColor="@color/widget_on_surface_variant"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row2_min"
+                    android:textColor="#80276D"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:text="@string/widget_preview_fav_row2_clock"
+                    android:textColor="@color/widget_on_surface_variant"
+                    android:textSize="10sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

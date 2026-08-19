@@ -42,6 +42,7 @@ import com.saarlabs.tminus.android.util.formattedTime
 import com.saarlabs.tminus.model.WidgetStationBoardDeparture
 import com.saarlabs.tminus.model.response.ApiResult
 import com.saarlabs.tminus.util.EasternTimeInstant
+import com.saarlabs.tminus.android.util.clockWithTrack
 
 internal data class FavoriteDepartureRow(
     val stopName: String,
@@ -229,7 +230,14 @@ private object FavoritesContent {
                         maxLines = 1,
                     )
                     Text(
-                        text = departure.departureTime.formattedTime(use24Hour),
+                        // Commuter rail publishes a track; the board next to it shows one, so a
+                        // favourite for the same station should not be the surface that hides it.
+                        text =
+                            clockWithTrack(
+                                context,
+                                departure.departureTime.formattedTime(use24Hour),
+                                departure.platform,
+                            ),
                         style =
                             TextStyle(
                                 color = ColorProvider(secondary),

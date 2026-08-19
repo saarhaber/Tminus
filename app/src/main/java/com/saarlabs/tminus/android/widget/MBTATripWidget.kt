@@ -42,7 +42,7 @@ import com.saarlabs.tminus.model.RouteType
 import com.saarlabs.tminus.model.WidgetTripConfig
 import com.saarlabs.tminus.model.WidgetTripData
 import com.saarlabs.tminus.ui.theme.readFontScale
-import com.saarlabs.tminus.ui.widgetTripStopDisplayLabel
+import com.saarlabs.tminus.ui.plainStopLabel
 import com.saarlabs.tminus.MainActivity
 import com.saarlabs.tminus.R
 import com.saarlabs.tminus.android.util.colorFromHex
@@ -396,9 +396,9 @@ private object WidgetContent {
         fontScale: Float,
     ) {
         val fromLabel =
-            widgetTripStopDisplayLabel(config.fromLabel, tripData.fromStop, context.resources)
+            plainStopLabel(config.fromLabel, tripData.fromStop, context.resources)
         val toLabel =
-            widgetTripStopDisplayLabel(config.toLabel, tripData.toStop, context.resources)
+            plainStopLabel(config.toLabel, tripData.toStop, context.resources)
         val fallback = onSurface(context)
         val routeColor =
             runCatching { colorFromHex(tripData.route.color) }.getOrElse { fallback }

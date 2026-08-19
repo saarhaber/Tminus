@@ -68,13 +68,17 @@ public class StationBoardWidgetConfigActivity : ComponentActivity() {
 
         val store = WidgetConfigStore(applicationContext)
         val appWidgetId =
-            intent
-                ?.getIntExtra(
-                    AppWidgetManager.EXTRA_APPWIDGET_ID,
-                    AppWidgetManager.INVALID_APPWIDGET_ID,
-                )
-                ?.takeIf { it != AppWidgetManager.INVALID_APPWIDGET_ID }
-                ?: store.takePendingStationBoardConfigWidgetId()
+            resolveConfigTargetId(
+                intentId =
+                    intent?.getIntExtra(
+                        AppWidgetManager.EXTRA_APPWIDGET_ID,
+                        AppWidgetManager.INVALID_APPWIDGET_ID,
+                    )
+                        ?: AppWidgetManager.INVALID_APPWIDGET_ID,
+                pendingId = store.peekPendingStationBoardConfigWidgetId(),
+                placedIds = placedWidgetIds(this, MBTAStationBoardWidgetReceiver::class.java),
+                isConfigured = { store.stationBoardConfig(it) != null },
+            )
 
         setResult(RESULT_CANCELED)
 
@@ -94,6 +98,7 @@ public class StationBoardWidgetConfigActivity : ComponentActivity() {
                     StationBoardConfigScreen(
                         onSave = { config ->
                             store.setStationBoardConfig(appWidgetId, config)
+                            store.clearPendingStationBoardConfigWidgetId()
                             setResult(
                                 RESULT_OK,
                                 Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),

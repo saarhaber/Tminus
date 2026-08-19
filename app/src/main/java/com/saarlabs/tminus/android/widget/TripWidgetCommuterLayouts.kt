@@ -33,6 +33,8 @@ import com.saarlabs.tminus.model.RouteType
 import com.saarlabs.tminus.model.WidgetTripData
 import com.saarlabs.tminus.android.util.formattedTime
 import kotlin.math.min
+import com.saarlabs.tminus.android.util.departureTrackText
+import com.saarlabs.tminus.android.util.tripTrackText
 
 /**
  * Responsive commuter-rail style trip widget: master (large), compact (square), and inline
@@ -416,6 +418,23 @@ internal object TripWidgetCommuterLayouts {
                                 ),
                             maxLines = 1,
                         )
+                        // Commuter rail is the only mode with a published track, and it is the
+                        // thing a rider on the platform actually needs. It sits opposite the
+                        // direction label rather than under the times, which are already two lines.
+                        tripTrackText(context, tripData)?.let { tracks ->
+                            Spacer(modifier = GlanceModifier.width(t.gapSm))
+                            Text(
+                                text = tracks,
+                                style =
+                                    TextStyle(
+                                        color = ColorProvider(onSurface),
+                                        fontSize = t.stripPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.End,
+                                    ),
+                                maxLines = 1,
+                            )
+                        }
                     }
                     Spacer(modifier = GlanceModifier.height(t.gapXs))
                     Text(
@@ -530,6 +549,21 @@ internal object TripWidgetCommuterLayouts {
                         ),
                     maxLines = 2,
                 )
+                // Only the boarding track fits at this size, and it is the one that matters when
+                // you are standing at the origin station.
+                departureTrackText(context, tripData.fromPlatform)?.let { track ->
+                    Text(
+                        text = track,
+                        style =
+                            TextStyle(
+                                color = ColorProvider(onSurfaceVariant),
+                                fontSize = t.compactSub,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                            ),
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

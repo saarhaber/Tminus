@@ -27,9 +27,62 @@ All notable changes to tMinus are recorded here. The format follows
   outages and fired on unrelated ones. They now use the API's stop filter.
 - Notification delivery markers accumulated in `SharedPreferences` forever.
 - Live widget updates did not resume after a reboot.
+- The favorite stops and service alerts widgets showed a bare loading spinner in the widget picker:
+  both declared the loading layout as their `previewLayout`. They now preview their real content —
+  station names, headsigns and countdowns for favorites, effect and alert text for alerts.
+- The station board's picker preview had drifted from the widget: no line-coloured rail, square row
+  corners, and a schedule line reading "in 3 min" where the widget renders "3 min".
+- Track numbers were missing everywhere except the station board. The commuter rail trip widget —
+  the only mode MBTA publishes a track for — never drew one at all; the favorite stops widget
+  dropped the track it had already fetched; and the subway trip layout hid it below 5x4 cells.
+  The trip widget now shows both ends' tracks (once, when they are the same), and the boards append
+  the track to the departure's clock time.
+- Configuring a widget could leave it on "Tap to set up" while a different widget picked up the
+  configuration. When a launcher starts the configuration activity without `EXTRA_APPWIDGET_ID`,
+  the id recorded by the waiting widget is now only trusted if it still names a placed, unconfigured
+  widget; otherwise the single unconfigured widget of that provider is used. The recorded id is also
+  no longer consumed on read, which had made a rotation mid-setup close the activity with nothing
+  saved.
+- Home's station cards truncated the destination to "Wor…" when the route name was long, because
+  the route chip and the destination shared one line. The chip now sits above the destination.
+- The last/first train notification printed a raw ISO timestamp (`2026-08-17T23:45`) for the
+  departure instead of a formatted clock time in the user's chosen 12/24-hour style.
+- Accessibility alerts notified again on every worker run. Delivery markers expired on the number
+  at the end of their key, which is an epoch for trip alerts but an MBTA alert id for these — read
+  as a timestamp, six digits is January 1970, so the marker was always already expired. Markers now
+  record when they were delivered, and service alerts keep theirs for 30 days rather than 3.
+- Elevator and escalator alerts never notified at all. The V3 alerts endpoint applies its own
+  `filter[activity]` default of `BOARD,EXIT,RIDE` when the parameter is absent, and lift and
+  escalator outages are filed under `USING_WHEELCHAIR` and `USING_ESCALATOR` — so the station watch
+  fetched alerts for the right route and stops and the closures were filtered out before the app
+  ever saw them. The accessibility query now names the activities it needs, restating the defaults
+  it replaces so ordinary stop closures keep arriving.
+- A notification dropped for want of notification permission was still recorded as delivered, so the
+  event stayed silent for good once permission was granted. Delivery is now recorded only after the
+  notification reaches the shade.
+- Each periodic run queued another exact wakeup for the same departure — four for one arrival in
+  testing — and every one of them woke the process and re-ran the worker, MBTA fetches included,
+  only for the delivery marker to throw the result away. Wakeups are now keyed per event.
+- "Time to leave" showed two countdowns that disagreed: the title's minutes were computed when the
+  worker ran, while Android rendered the notification's timestamp as its own live relative time, so
+  "Departs in 6 min" sat beside a header reading "in 5m". The departure remains in the body as a
+  clock time, which cannot drift out of step.
+- Notifications repeated the stop picker's disambiguation suffix, so a commute alert read "South
+  Station (Transit hub) → Back Bay (Transit hub) · 10:02 AM" and was cut off after the arrow — the
+  destination, the one thing the line is for, never survived. Notifications now use the plain stop
+  name, as the trip widget already did; a label the user typed themselves is still respected.
 
 ### Changed
 
+- Notifications are drawn by the platform instead of a custom `RemoteViews`. The old layout painted
+  the whole notification in the route colour and hard-coded the text colours, which ignored dark
+  mode, Material You and font settings, and clipped long alert text to one line. The line colour now
+  tints the notification the way Android expects, long text expands, and each alert carries the
+  commute or watch name as its sub-text and its track where there is one. Station alerts lead with
+  what has actually failed — "Elevator out at Chinatown" rather than "Station accessibility alert",
+  which only repeated what the icon already said — and keep the MBTA's own sentence, with the unit
+  number and the platforms it serves, as the body. "Time to leave" leads with the countdown and retires itself ten minutes after the
+  train has gone.
 - The next trip widget (subway, bus and ferry) was relaid out. "min" now sits on the countdown's
   baseline instead of on the body's next line, where it drifted away from its own digits as the
   widget grew; the departure and arrival times moved into a footer band that lines up with the stop

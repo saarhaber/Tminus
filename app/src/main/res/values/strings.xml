@@ -72,15 +72,18 @@
     <string name="commute_use_stops">Use these stops</string>
 
     <string name="notif_channel_commute">Commute alerts</string>
-    <string name="notif_leave_title">Time to leave</string>
-    <string name="notif_leave_body">%1$s · %2$s from %3$s — departs in ~%4$d min</string>
+    <string name="notif_leave_title_now">Departing now</string>
+    <string name="notif_leave_title_minutes">Departs in %1$d min</string>
+    <string name="notif_leave_text">%1$s → %2$s · %3$s</string>
     <string name="notif_arrival_title">Arriving</string>
-    <string name="notif_arrival_body">%1$s — nearing %2$s (scheduled)</string>
+    <string name="notif_arrival_text">%1$s · scheduled %2$s</string>
     <string name="notif_last_train_title">Last train reminder</string>
     <string name="notif_first_train_title">First train reminder</string>
-    <string name="notif_last_train_body">%1$s · %2$s — dep. ~%3$s (scheduled)</string>
+    <string name="notif_last_train_text">%1$s · departs %2$s</string>
     <string name="notif_accessibility_title">Station accessibility alert</string>
-    <string name="notif_accessibility_body">%1$s: %2$s</string>
+    <string name="notif_accessibility_title_elevator">Elevator out at %1$s</string>
+    <string name="notif_accessibility_title_escalator">Escalator out at %1$s</string>
+    <string name="notif_accessibility_title_stop_closed">%1$s is closed</string>
 
     <string name="stop_search_hint">Search stops…</string>
     <string name="stop_favorite">Add to favorites</string>
@@ -197,6 +200,7 @@
     <string name="widget_now">now</string>
     <string name="widget_refresh_short">Refresh</string>
     <string name="widget_track_short">Track %1$s</string>
+    <string name="widget_clock_with_track">%1$s · %2$s</string>
     <string name="widget_train">Train %1$s</string>
     <string name="widget_mbta_mark_content_description">MBTA</string>
     <string name="widget_trip_route_type_commuter">Commuter Rail</string>
@@ -223,14 +227,10 @@
     <string name="widget_preview_station_board_station">Park Street</string>
     <string name="widget_preview_sb_row1_route">Red</string>
     <string name="widget_preview_sb_row1_dest">Alewife</string>
-    <string name="widget_preview_sb_row1_clock">7:45 AM</string>
-    <string name="widget_preview_sb_row1_min">in 3 min</string>
     <string name="widget_preview_sb_row2_route">Green</string>
     <string name="widget_preview_sb_row2_dest">Heath St</string>
-    <string name="widget_preview_sb_row2_clock">7:48 AM</string>
-    <string name="widget_preview_sb_row2_min">in 6 min</string>
-    <string name="widget_preview_sb_row1_times_line">in 3 min · 7:45 AM</string>
-    <string name="widget_preview_sb_row2_times_line">in 6 min · 7:48 AM</string>
+    <string name="widget_preview_sb_row1_times_line">3 min · 7:45 AM</string>
+    <string name="widget_preview_sb_row2_times_line">6 min · 7:48 AM</string>
     <string name="widget_station_board_select_stop_placeholder">Search stops</string>
     <string name="widget_station_board_selecting_stop">Station</string>
     <string name="widget_station_board_route_section">Line filter</string>
@@ -294,6 +294,14 @@
     <string name="widget_favorites_subtitle">Next departures</string>
     <string name="widget_favorites_empty">Add favorite stops in tMinus to see them here.</string>
     <string name="widget_favorites_error">Departures unavailable. Open tMinus or check your connection.</string>
+    <string name="widget_preview_fav_row1_stop">Davis</string>
+    <string name="widget_preview_fav_row1_headsign">Ashmont</string>
+    <string name="widget_preview_fav_row1_min">3 min</string>
+    <string name="widget_preview_fav_row1_clock">7:45 AM</string>
+    <string name="widget_preview_fav_row2_stop">Natick Center</string>
+    <string name="widget_preview_fav_row2_headsign">South Station</string>
+    <string name="widget_preview_fav_row2_min">12 min</string>
+    <string name="widget_preview_fav_row2_clock">7:52 AM · Track 2</string>
     <string name="widget_favorites_configure_title">Favorite stops widget</string>
     <string name="widget_favorites_count_label">Stops to show</string>
     <string name="widget_favorites_sort_soonest">Show soonest departures first</string>
@@ -304,6 +312,10 @@
     <string name="widget_alerts_subtitle">Subway lines</string>
     <string name="widget_alerts_none">All lines running normally.</string>
     <string name="widget_alerts_error">Alerts unavailable. Open tMinus or check your connection.</string>
+    <string name="widget_preview_alerts_row1_effect">Delay</string>
+    <string name="widget_preview_alerts_row1_header">Red Line: delays of up to 10 minutes due to a disabled train at Andrew.</string>
+    <string name="widget_preview_alerts_row2_effect">Elevator Closure</string>
+    <string name="widget_preview_alerts_row2_header">Orange Line: the elevator to the Back Bay platform is out of service.</string>
     <string name="widget_alerts_configure_title">Service alerts widget</string>
     <string name="widget_alerts_lines_label">Lines to watch</string>
     <string name="widget_alerts_line_red">Red Line</string>
