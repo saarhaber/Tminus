@@ -46,10 +46,16 @@ public fun stopOneLineDisplay(stop: Stop, res: Resources): String {
 }
 
 /**
- * Label shown on trip widgets: plain stop name. Treats legacy saved values that used
- * [stopOneLineDisplay] as equivalent to [stop.name] so "(Transit hub)" subtitles do not appear.
+ * A saved stop label as it should read outside the picker that produced it.
+ *
+ * [stopOneLineDisplay] appends a mode subtitle so two stops of the same name can be told apart in a
+ * search list, and editors save the result. Everywhere else that suffix is noise: "South Station
+ * (Transit hub) → Back Bay (Transit hub)" spends most of a notification line on two words the
+ * reader already knows, and pushes the destination past the truncation point. A label the user
+ * typed themselves is kept as-is; one that is merely the picker's own rendering collapses back to
+ * the plain stop name.
  */
-public fun widgetTripStopDisplayLabel(configured: String, stop: Stop, res: Resources): String {
+public fun plainStopLabel(configured: String, stop: Stop, res: Resources): String {
     val trimmed = configured.trim()
     if (trimmed.isEmpty() || trimmed == stop.name) return stop.name
     if (trimmed == stopOneLineDisplay(stop, res)) return stop.name

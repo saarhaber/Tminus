@@ -81,6 +81,9 @@
     <string name="notif_first_train_title">First train reminder</string>
     <string name="notif_last_train_text">%1$s · departs %2$s</string>
     <string name="notif_accessibility_title">Station accessibility alert</string>
+    <string name="notif_accessibility_title_elevator">Elevator out at %1$s</string>
+    <string name="notif_accessibility_title_escalator">Escalator out at %1$s</string>
+    <string name="notif_accessibility_title_stop_closed">%1$s is closed</string>
 
     <string name="stop_search_hint">Search stops…</string>
     <string name="stop_favorite">Add to favorites</string>

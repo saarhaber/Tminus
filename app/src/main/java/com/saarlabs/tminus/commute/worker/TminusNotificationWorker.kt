@@ -21,6 +21,7 @@ import com.saarlabs.tminus.android.util.clockWithTrack
 import com.saarlabs.tminus.commute.CommuteRepository
 import com.saarlabs.tminus.commute.CommuteTripPlanner
 import com.saarlabs.tminus.ui.formatClock
+import com.saarlabs.tminus.ui.plainStopLabel
 import com.saarlabs.tminus.features.AccessibilityRepository
 import com.saarlabs.tminus.features.LastTrainMode
 import com.saarlabs.tminus.features.LastTrainRepository
@@ -117,7 +118,8 @@ public class TminusNotificationWorker(
                 )
                     ?: continue
 
-            val fromName = profile.fromLabel.ifBlank { trip.fromStop.name }
+            val res = applicationContext.resources
+            val fromName = plainStopLabel(profile.fromLabel, trip.fromStop, res)
             val leaveKey = "leave_${profile.id}_${trip.tripId}_${trip.departureTime.toEpochMilliseconds()}"
             val arrivalKey = "arr_${profile.id}_${trip.tripId}_${trip.arrivalTime.toEpochMilliseconds()}"
 
@@ -127,7 +129,7 @@ public class TminusNotificationWorker(
 
             if (leaveAtMs <= nowMs && nowMs < leaveAtMs + WINDOW_MS) {
                 if (!prefs.contains(leaveKey)) {
-                    val toName = profile.toLabel.ifBlank { trip.toStop.name }
+                    val toName = plainStopLabel(profile.toLabel, trip.toStop, res)
                     val departureLine =
                         clockWithTrack(
                             applicationContext,
@@ -185,7 +187,7 @@ public class TminusNotificationWorker(
                 val arrMs = trip.arrivalTime.toEpochMilliseconds()
                 if (arrMs <= nowMs && nowMs < arrMs + ARRIVAL_WINDOW_MS) {
                     if (!prefs.contains(arrivalKey)) {
-                        val toName = profile.toLabel.ifBlank { trip.toStop.name }
+                        val toName = plainStopLabel(profile.toLabel, trip.toStop, res)
                         val posted =
                             notify(
                                 id = arrivalKey.hashCode(),
@@ -245,7 +247,7 @@ public class TminusNotificationWorker(
             if (!p.daysOfWeek.contains(todayDow)) continue
 
             val stop = global.getStop(p.stopId) ?: continue
-            val label = p.stopLabel.ifBlank { stop.name }
+            val label = plainStopLabel(p.stopLabel, stop, applicationContext.resources)
 
             val depResult =
                 when (p.mode) {
@@ -340,7 +342,7 @@ public class TminusNotificationWorker(
 
         for (w in watches) {
             val stop = global.getStop(w.stopId) ?: continue
-            val stopName = w.stopLabel.ifBlank { stop.name }
+            val stopName = plainStopLabel(w.stopLabel, stop, applicationContext.resources)
 
             val alertsResult =
                 graph.client.fetchAlertsForRoute(
@@ -370,7 +372,11 @@ public class TminusNotificationWorker(
                     notify(
                         id = key.hashCode(),
                         channelId = TminusNotificationChannels.ACCESSIBILITY,
-                        title = applicationContext.getString(R.string.notif_accessibility_title),
+                        // The title is what a locked screen or a collapsed bundle shows, so it
+                        // carries the news — which station, and what has failed — rather than the
+                        // category name the icon already conveys. The MBTA's own sentence, with the
+                        // unit number and the route it serves, stays in the body.
+                        title = accessibilityTitle(effect, stopName),
                         // Alert headers run to a couple of sentences; BigTextStyle in [notify] is
                         // what lets the whole thing be read instead of one ellipsised line.
                         text = alert.header,
@@ -383,6 +389,23 @@ public class TminusNotificationWorker(
             }
         }
     }
+
+    /** "Elevator out at Chinatown" rather than "Station accessibility alert". */
+    private fun accessibilityTitle(effect: String, stopName: String): String =
+        when (effect) {
+            "ELEVATOR_CLOSURE" ->
+                applicationContext.getString(R.string.notif_accessibility_title_elevator, stopName)
+            "ESCALATOR_CLOSURE" ->
+                applicationContext.getString(R.string.notif_accessibility_title_escalator, stopName)
+            "STOP_CLOSURE" ->
+                applicationContext.getString(
+                    R.string.notif_accessibility_title_stop_closed,
+                    stopName,
+                )
+            // Unreachable while the caller filters on the three above, but a new effect added to
+            // that set should degrade to the old generic wording rather than to a blank title.
+            else -> applicationContext.getString(R.string.notif_accessibility_title)
+        }
 
     private fun isoDayOfWeek(date: LocalDate): Int =
         when (date.dayOfWeek) {

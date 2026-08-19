@@ -67,6 +67,10 @@ All notable changes to tMinus are recorded here. The format follows
   worker ran, while Android rendered the notification's timestamp as its own live relative time, so
   "Departs in 6 min" sat beside a header reading "in 5m". The departure remains in the body as a
   clock time, which cannot drift out of step.
+- Notifications repeated the stop picker's disambiguation suffix, so a commute alert read "South
+  Station (Transit hub) → Back Bay (Transit hub) · 10:02 AM" and was cut off after the arrow — the
+  destination, the one thing the line is for, never survived. Notifications now use the plain stop
+  name, as the trip widget already did; a label the user typed themselves is still respected.
 
 ### Changed
 
@@ -74,7 +78,10 @@ All notable changes to tMinus are recorded here. The format follows
   the whole notification in the route colour and hard-coded the text colours, which ignored dark
   mode, Material You and font settings, and clipped long alert text to one line. The line colour now
   tints the notification the way Android expects, long text expands, and each alert carries the
-  commute or watch name as its sub-text and its track where there is one. "Time to leave" leads with the countdown and retires itself ten minutes after the
+  commute or watch name as its sub-text and its track where there is one. Station alerts lead with
+  what has actually failed — "Elevator out at Chinatown" rather than "Station accessibility alert",
+  which only repeated what the icon already said — and keep the MBTA's own sentence, with the unit
+  number and the platforms it serves, as the body. "Time to leave" leads with the countdown and retires itself ten minutes after the
   train has gone.
 - The next trip widget (subway, bus and ferry) was relaid out. "min" now sits on the countdown's
   baseline instead of on the body's next line, where it drifted away from its own digits as the
