@@ -24,6 +24,12 @@ All notable changes to tMinus are recorded here. The format follows
   exceeded the route's headway, and the alert's own firing condition — reachable only when that gap
   sits just under the lead — could not be met by any train. Selection now skips departures too soon
   to reach at the chosen lead, and holds that trip steady for as long as its alert is postable.
+- The commute editor's "Sample trip" preview showed a train the commute was not about. It picked the
+  soonest departure in the window while the alert picked the soonest one reachable at the profile's
+  lead, so on a frequent route the preview named an earlier train and an "approx. leave by" that had
+  already passed — a 4:20 PM preview offering a 4:22 departure to leave for at 4:10. The preview now
+  selects with the same lead-aware bound as the alert, so the editor and the notification are about
+  one train.
 - A commute alerts once per service day, as intended, rather than re-arming for each following
   train as the previous one becomes uncatchable. The arrival ping follows the train the leave alert
   named instead of whatever departs next by the time it is due.
