@@ -18,6 +18,18 @@ All notable changes to tMinus are recorded here. The format follows
 
 ### Fixed
 
+- A commute with a lead time of roughly 10 minutes or more never alerted at all on a frequent route
+  such as the Red Line. Trip selection always returned the soonest departure, so the gap to it never
+  exceeded the route's headway, and the alert's own firing condition — reachable only when that gap
+  sits just under the lead — could not be met by any train. Selection now skips departures too soon
+  to reach at the chosen lead, and holds that trip steady for as long as its alert is postable.
+- A commute alerts once per service day, as intended, rather than re-arming for each following
+  train as the previous one becomes uncatchable. The arrival ping follows the train the leave alert
+  named instead of whatever departs next by the time it is due.
+- Commute lookup windows can now cross midnight. They were clamped to 23:59 and anchored to the
+  calendar date, so an evening commute lost the departures either side of midnight and an
+  after-midnight one was matched against the wrong weekday. They are built on the service day now,
+  like the rest of the app.
 - Widgets stayed on "Tap to set up" after being configured. Glance's `update()` only recomposes
   already-registered content, so configuration read before `provideContent` was never refreshed for
   the life of the session. Widgets now render as soon as the configuration activity closes.

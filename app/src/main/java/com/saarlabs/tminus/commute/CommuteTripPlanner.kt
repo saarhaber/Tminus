@@ -10,8 +10,8 @@ import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 
 /**
- * Finds the next trip between two stops whose departure falls in
- * [max(now, windowStart), windowEnd] (for commute windows).
+ * Finds the next trip between two stops whose departure falls in a commute window and is still
+ * reachable at the profile's notification lead.
  */
 internal object CommuteTripPlanner {
 
@@ -99,6 +99,11 @@ internal object CommuteTripPlanner {
         )
     }
 
+    /**
+     * Next trip in `[windowStart, windowEnd]` that the user can still catch with [leadMinutes]
+     * notice — see [commuteDepartureLowerBound] for why the lead belongs in the selection and not
+     * only in the alert that follows it.
+     */
     fun findNextTripInWindow(
         response: ScheduleResponse,
         globalData: GlobalData,
@@ -107,6 +112,7 @@ internal object CommuteTripPlanner {
         now: EasternTimeInstant,
         windowStart: EasternTimeInstant,
         windowEnd: EasternTimeInstant,
+        leadMinutes: Int,
     ): WidgetTripData? {
         val stops = globalData.stops
         val fromSchedules =
@@ -124,7 +130,12 @@ internal object CommuteTripPlanner {
                     .map { toSchedule -> fromSchedule to toSchedule }
             }
 
-        val lower = if (now > windowStart) now else windowStart
+        val lower =
+            commuteDepartureLowerBound(
+                now = now,
+                windowStart = windowStart,
+                leadMinutes = leadMinutes,
+            )
 
         val nextTrip =
             tripPairs

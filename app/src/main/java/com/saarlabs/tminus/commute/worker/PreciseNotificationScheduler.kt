@@ -21,8 +21,6 @@ internal object PreciseNotificationScheduler {
      */
     private const val MAX_LOOKAHEAD_MS = 45L * 60_000L
 
-    /** Don't schedule for events in the past or extremely near-future (periodic tick handles those). */
-    private const val MIN_LEAD_MS = 60_000L
 
     /**
      * Queue a wakeup for [tag]'s event, replacing any wakeup already queued for it.
@@ -37,7 +35,10 @@ internal object PreciseNotificationScheduler {
     fun scheduleAt(context: Context, tag: String, triggerAtMs: Long) {
         val nowMs = System.currentTimeMillis()
         val delayMs = triggerAtMs - nowMs
-        if (delayMs < MIN_LEAD_MS || delayMs > MAX_LOOKAHEAD_MS) return
+        // Any positive delay is worth a wakeup. Near-future events used to be left to the periodic
+        // tick, but that tick is up to 15 minutes away and the trip it re-plans by then is a
+        // different one — a leave time 50 seconds out was simply dropped.
+        if (delayMs <= 0 || delayMs > MAX_LOOKAHEAD_MS) return
         val uniqueName = TAG_PREFIX + tag
         val work =
             OneTimeWorkRequestBuilder<TminusNotificationWorker>()

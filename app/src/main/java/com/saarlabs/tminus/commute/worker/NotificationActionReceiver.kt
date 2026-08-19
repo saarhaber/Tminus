@@ -114,6 +114,24 @@ internal class NotificationActionReceiver : BroadcastReceiver() {
 internal fun muteKey(profileId: String, serviceDateMs: Long): String =
     "mute_${profileId}_$serviceDateMs"
 
+/**
+ * Marker for "this profile's leave alert already went out on this service day".
+ *
+ * A commute earns one "time to leave" a day. The per-trip marker cannot express that: once the
+ * train we alerted about is no longer catchable, the planner moves to the next one, which is a
+ * different trip with a different key — on a five-minute headway that is a fresh alert every five
+ * minutes until the window closes.
+ */
+internal fun leaveDayKey(profileId: String, serviceDateMs: Long): String =
+    "leaveday_${profileId}_$serviceDateMs"
+
+/**
+ * The arrival the leave alert was about, so the arrival ping follows the train the user was
+ * actually told to catch rather than whichever one is next by the time it is due.
+ */
+internal fun plannedArrivalKey(profileId: String, serviceDateMs: Long): String =
+    "arrplan_${profileId}_$serviceDateMs"
+
 /** Marker for "re-post this profile's leave alert at [fireAtMs]". */
 internal fun snoozeKey(profileId: String, fireAtMs: Long): String =
     "snooze_${profileId}_$fireAtMs"

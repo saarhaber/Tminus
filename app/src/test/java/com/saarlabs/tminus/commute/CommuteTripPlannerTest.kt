@@ -13,6 +13,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.Month
 
 class CommuteTripPlannerTest {
@@ -97,6 +99,7 @@ class CommuteTripPlannerTest {
                 now = at(7, 0),
                 windowStart = at(8, 0),
                 windowEnd = at(9, 0),
+                leadMinutes = 0,
             )
         assertNotNull(tripData)
         assertEquals("t2", tripData.tripId)
@@ -125,6 +128,7 @@ class CommuteTripPlannerTest {
                 now = at(7, 0),
                 windowStart = at(7, 0),
                 windowEnd = at(10, 0),
+                leadMinutes = 0,
             ),
         )
     }
@@ -151,6 +155,7 @@ class CommuteTripPlannerTest {
                 now = at(8, 20),
                 windowStart = at(8, 0),
                 windowEnd = at(23, 0),
+                leadMinutes = 0,
             )
         assertEquals("t2", assertNotNull(tripData).tripId)
     }
@@ -208,5 +213,131 @@ class CommuteTripPlannerTest {
                 selectedDaysOfWeek = emptySet(),
             )
         assertEquals("inWindow", assertNotNull(tripData).tripId)
+    }
+
+    /** [count] trips leaving "from" every [everyMinutes] starting at [first], 25 minutes to "to". */
+    private fun frequentService(
+        first: EasternTimeInstant,
+        count: Int,
+        everyMinutes: Int,
+    ): ScheduleResponse {
+        val ids = (0 until count).map { "t$it" }
+        val schedules =
+            ids.flatMapIndexed { i, id ->
+                val departure = first + (i * everyMinutes).minutes
+                listOf(
+                    schedule("f$i", id, "from", 1, departure),
+                    schedule("a$i", id, "to", 5, departure + 25.minutes),
+                )
+            }
+        return response(*ids.toTypedArray(), schedules = schedules)
+    }
+
+    @Test
+    fun skipsDeparturesTooSoonToReachAtTheChosenLead() {
+        val resp =
+            response(
+                "soon", "reachable",
+                schedules =
+                    listOf(
+                        schedule("s1", "soon", "from", 1, at(8, 2)),
+                        schedule("s2", "soon", "to", 5, at(8, 32)),
+                        schedule("s3", "reachable", "from", 1, at(8, 10)),
+                        schedule("s4", "reachable", "to", 5, at(8, 40)),
+                    ),
+            )
+        val tripData =
+            CommuteTripPlanner.findNextTripInWindow(
+                response = resp,
+                globalData = globalData,
+                fromStopId = "from",
+                toStopId = "to",
+                now = at(8, 0),
+                windowStart = at(7, 45),
+                windowEnd = at(8, 45),
+                leadMinutes = 12,
+            )
+        // Two minutes' notice is no notice at all when the user asked for twelve.
+        assertEquals("reachable", assertNotNull(tripData).tripId)
+    }
+
+    @Test
+    fun holdsTheSelectedTripWhileItsAlertIsStillPostable() {
+        val resp = frequentService(at(8, 0), count = 12, everyMinutes = 5)
+        fun tripAt(now: EasternTimeInstant) =
+            CommuteTripPlanner.findNextTripInWindow(
+                response = resp,
+                globalData = globalData,
+                fromStopId = "from",
+                toStopId = "to",
+                now = now,
+                windowStart = at(7, 45),
+                windowEnd = at(8, 45),
+                leadMinutes = 12,
+            )
+
+        // The moment the 8:10 train's alert comes due: its leave time is 7:58, and the alert is
+        // postable for five minutes from there.
+        val due = at(7, 59)
+        val selected = assertNotNull(tripAt(due))
+        assertEquals(at(8, 10), selected.departureTime)
+        assertTrue(
+            isLeaveAlertDue(
+                leaveAtMs = at(7, 58).toEpochMilliseconds(),
+                nowMs = due.toEpochMilliseconds(),
+            ),
+        )
+        // A wakeup that lands late must still find the trip it woke up for. If selection stepped
+        // on to the next train here, no train's alert would ever be postable — that was the bug.
+        for (late in listOf(1, 2, 4)) {
+            assertEquals(
+                selected.tripId,
+                assertNotNull(tripAt(due + late.minutes)).tripId,
+                "selection moved on $late min after the alert came due",
+            )
+        }
+    }
+
+    @Test
+    fun aFrequentRouteAlertsWhicheverMinuteTheWorkerFirstRuns() {
+        // The reported failure: on a 5-minute headway with a 12-minute lead, the alert was
+        // unpostable at every minute of the window, because selection always returned a train
+        // closer than the lead. Sweep every starting minute rather than trusting one alignment.
+        val lead = 12
+        val resp = frequentService(at(7, 30), count = 25, everyMinutes = 5)
+        for (offset in 0 until 60) {
+            val start = at(7, 30) + offset.minutes
+            var firedAt: EasternTimeInstant? = null
+            var departure: EasternTimeInstant? = null
+            var now = start
+            while (firedAt == null && now <= at(9, 0)) {
+                val trip =
+                    CommuteTripPlanner.findNextTripInWindow(
+                        response = resp,
+                        globalData = globalData,
+                        fromStopId = "from",
+                        toStopId = "to",
+                        now = now,
+                        windowStart = at(7, 45),
+                        windowEnd = at(8, 45),
+                        leadMinutes = lead,
+                    )
+                if (trip != null) {
+                    val leaveAtMs =
+                        trip.departureTime.toEpochMilliseconds() - lead * 60_000L
+                    if (isLeaveAlertDue(leaveAtMs, now.toEpochMilliseconds())) {
+                        firedAt = now
+                        departure = trip.departureTime
+                    }
+                }
+                now += 1.minutes
+            }
+            val at = assertNotNull(firedAt, "no alert at all for a worker starting at $start")
+            val notice = (assertNotNull(departure) - at).inWholeMinutes
+            assertTrue(
+                notice in (lead - LEAVE_ALERT_WINDOW_MINUTES).toLong()..lead.toLong(),
+                "alert for a worker starting at $start gave $notice min notice, not ~$lead",
+            )
+        }
     }
 }

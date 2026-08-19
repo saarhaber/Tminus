@@ -20,20 +20,18 @@ import com.saarlabs.tminus.R
 import com.saarlabs.tminus.android.util.clockWithTrack
 import com.saarlabs.tminus.commute.CommuteRepository
 import com.saarlabs.tminus.commute.CommuteTripPlanner
+import com.saarlabs.tminus.commute.commuteWindow
+import com.saarlabs.tminus.commute.isLeaveAlertDue
+import com.saarlabs.tminus.commute.serviceDayHHmm
 import com.saarlabs.tminus.ui.formatClock
 import com.saarlabs.tminus.ui.plainStopLabel
 import com.saarlabs.tminus.features.AccessibilityRepository
 import com.saarlabs.tminus.features.LastTrainMode
 import com.saarlabs.tminus.features.LastTrainRepository
-import kotlin.math.max
-import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
 
 /**
  * Single periodic worker: commutes, last/first train, accessibility route alerts.
@@ -74,10 +72,12 @@ public class TminusNotificationWorker(
                 is ApiResult.Error -> return
             }
 
-        val tz = EasternTimeInstant.timeZone
         val nowEt = EasternTimeInstant.now()
-        val today = nowEt.local.date
-        val todayDow = isoDayOfWeek(today)
+        // Service date, not calendar date: at 00:40 the commute that is still running is the one
+        // the user set for *yesterday*, and its window has to be built on yesterday's date or the
+        // train they are waiting for is a day away.
+        val serviceDate = nowEt.serviceDate
+        val todayDow = isoDayOfWeek(serviceDate)
 
         val serviceDateMs = NotificationActionReceiver.currentServiceDateMs(nowEt)
 
@@ -92,12 +92,10 @@ public class TminusNotificationWorker(
                 (global.stopIdsForScheduleFilter(fromStop) + global.stopIdsForScheduleFilter(toStop))
                     .distinct()
 
-            val targetMinutes = profile.targetMinutesFromMidnight
-            val windowStart = max(0, targetMinutes - profile.windowMinutesBefore)
-            val windowEnd = min(24 * 60 - 1, targetMinutes + profile.windowMinutesAfter)
+            val window = commuteWindow(serviceDate, profile)
 
-            val minTime = minutesToHHmm(windowStart)
-            val maxTime = minutesToHHmm(windowEnd)
+            val minTime = serviceDayHHmm(window.startMinutes)
+            val maxTime = serviceDayHHmm(window.endMinutes)
 
             val schedResult = graph.client.fetchScheduleForStopsInWindow(stopIds, minTime, maxTime)
             val schedule =
@@ -106,9 +104,6 @@ public class TminusNotificationWorker(
                     is ApiResult.Error -> continue
                 }
 
-            val windowStartEt = atMinutesOnDate(today, windowStart, tz)
-            val windowEndEt = atMinutesOnDate(today, windowEnd, tz)
-
             val trip =
                 CommuteTripPlanner.findNextTripInWindow(
                     response = schedule,
@@ -116,15 +111,17 @@ public class TminusNotificationWorker(
                     fromStopId = profile.fromStopId,
                     toStopId = profile.toStopId,
                     now = nowEt,
-                    windowStart = windowStartEt,
-                    windowEnd = windowEndEt,
+                    windowStart = window.start,
+                    windowEnd = window.end,
+                    leadMinutes = profile.notifyLeadMinutes,
                 )
                     ?: continue
 
             val res = applicationContext.resources
             val fromName = plainStopLabel(profile.fromLabel, trip.fromStop, res)
             val leaveKey = "leave_${profile.id}_${trip.tripId}_${trip.departureTime.toEpochMilliseconds()}"
-            val arrivalKey = "arr_${profile.id}_${trip.tripId}_${trip.arrivalTime.toEpochMilliseconds()}"
+            val dayKey = leaveDayKey(profile.id, serviceDateMs)
+            val alertedToday = prefs.contains(dayKey)
 
             val leadMs = profile.notifyLeadMinutes * 60_000L
             val leaveAtMs = trip.departureTime.toEpochMilliseconds() - leadMs
@@ -134,8 +131,8 @@ public class TminusNotificationWorker(
             // even though the leave marker says it was already delivered — the user asked for it
             // again.
             val snoozed = dueSnoozeKey(prefs.all, profile.id, nowMs)
-            if ((leaveAtMs <= nowMs && nowMs < leaveAtMs + WINDOW_MS) || snoozed != null) {
-                if (snoozed != null || !prefs.contains(leaveKey)) {
+            if (isLeaveAlertDue(leaveAtMs = leaveAtMs, nowMs = nowMs) || snoozed != null) {
+                if (snoozed != null || (!alertedToday && !prefs.contains(leaveKey))) {
                     val toName = plainStopLabel(profile.toLabel, trip.toStop, res)
                     val departureLine =
                         clockWithTrack(
@@ -172,10 +169,21 @@ public class TminusNotificationWorker(
                             timeoutAtMs =
                                 trip.departureTime.toEpochMilliseconds() + LEAVE_GRACE_MS,
                         )
-                    if (posted) markDelivered(prefs, leaveKey, nowMs)
+                    if (posted) {
+                        markDelivered(prefs, leaveKey, nowMs)
+                        markDelivered(prefs, dayKey, nowMs)
+                        // The arrival ping belongs to *this* train. Re-planning when it comes due
+                        // would find whatever departs next, and announce an arrival the user is
+                        // already an hour past.
+                        markDelivered(
+                            prefs,
+                            plannedArrivalKey(profile.id, serviceDateMs),
+                            trip.arrivalTime.toEpochMilliseconds(),
+                        )
+                    }
                     snoozed?.let { prefs.edit().remove(it).apply() }
                 }
-            } else if (leaveAtMs > nowMs) {
+            } else if (leaveAtMs > nowMs && !alertedToday) {
                 // Schedule a precise wakeup at the exact leave time so the notification arrives
                 // at the user-chosen lead (e.g. 12 min before) instead of at the next 15-minute
                 // periodic tick which drifts.
@@ -187,10 +195,17 @@ public class TminusNotificationWorker(
             }
 
             if (profile.notifyOnArrival) {
-                val arrMs = trip.arrivalTime.toEpochMilliseconds()
+                val arrMs =
+                    prefs
+                        .getLong(plannedArrivalKey(profile.id, serviceDateMs), 0L)
+                        .takeIf { it > 0L }
+                        ?: trip.arrivalTime.toEpochMilliseconds()
+                val arrivalKey = "arr_${profile.id}_$arrMs"
                 if (arrMs <= nowMs && nowMs < arrMs + ARRIVAL_WINDOW_MS) {
                     if (!prefs.contains(arrivalKey)) {
                         val toName = plainStopLabel(profile.toLabel, trip.toStop, res)
+                        val arrivalEt =
+                            EasternTimeInstant(Instant.fromEpochMilliseconds(arrMs))
                         val posted =
                             notify(
                                 id = arrivalKey.hashCode(),
@@ -203,18 +218,17 @@ public class TminusNotificationWorker(
                                         toName,
                                         clockWithTrack(
                                             applicationContext,
-                                            trip.arrivalTime.formatClock(use24Hour),
+                                            arrivalEt.formatClock(use24Hour),
                                             trip.toPlatform,
                                         ),
                                     ),
                                 subText = profile.name,
                                 accentArgb = argbFromHexOrNull(trip.route.color),
-                                whenMs = trip.arrivalTime.toEpochMilliseconds(),
+                                whenMs = arrMs,
                                 // An arrival ping is about a moment, not a standing state; retire
                                 // it on the same grace period the leave notification uses rather
                                 // than leaving it in the shade until it is swiped.
-                                timeoutAtMs =
-                                    trip.arrivalTime.toEpochMilliseconds() + LEAVE_GRACE_MS,
+                                timeoutAtMs = arrMs + LEAVE_GRACE_MS,
                             )
                         if (posted) markDelivered(prefs, arrivalKey, nowMs)
                     }
@@ -259,8 +273,8 @@ public class TminusNotificationWorker(
                             p.routeId,
                             p.directionId,
                             p.stopId,
-                            minutesToHHmm(p.windowStartMinutes),
-                            minutesToHHmm(p.windowEndMinutes),
+                            serviceDayHHmm(p.windowStartMinutes),
+                            serviceDayHHmm(p.windowEndMinutes),
                             serviceDate = nowEt.serviceDate,
                         )
                     LastTrainMode.FIRST ->
@@ -268,8 +282,8 @@ public class TminusNotificationWorker(
                             p.routeId,
                             p.directionId,
                             p.stopId,
-                            minutesToHHmm(p.firstWindowStartMinutes),
-                            minutesToHHmm(p.firstWindowEndMinutes),
+                            serviceDayHHmm(p.firstWindowStartMinutes),
+                            serviceDayHHmm(p.firstWindowEndMinutes),
                             serviceDate = nowEt.serviceDate,
                         )
                 }
@@ -421,30 +435,6 @@ public class TminusNotificationWorker(
             kotlinx.datetime.DayOfWeek.SUNDAY -> 7
         }
 
-    /**
-     * Minutes-from-midnight as an MBTA service-day `HH:mm`.
-     *
-     * Hours are **not** clamped to 23: the MBTA expresses after-midnight service as 24:00–26:59 on
-     * the previous service day, and "last train home" windows routinely need it. Clamping here is
-     * what made it impossible to ask about a train leaving at 00:40.
-     */
-    private fun minutesToHHmm(minutes: Int): String {
-        val total = minutes.coerceIn(0, SERVICE_DAY_MAX_MINUTES)
-        val h = total / 60
-        val m = total % 60
-        return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
-    }
-
-    private fun atMinutesOnDate(
-        date: LocalDate,
-        minutesFromMidnight: Int,
-        tz: TimeZone,
-    ): EasternTimeInstant {
-        val h = minutesFromMidnight / 60
-        val m = minutesFromMidnight % 60
-        val ldt = LocalDateTime(date, LocalTime(h, m, 0, 0))
-        return EasternTimeInstant(ldt.toInstant(tz))
-    }
 
     /**
      * Posts one notification in the platform's own shape.
@@ -590,20 +580,20 @@ public class TminusNotificationWorker(
         public const val UNIQUE_NAME: String = "TminusNotifications"
         private const val PREFS_STATE = "tminus_notif_state"
 
-        /** Latest minute a service day can reach (26:59), so after-midnight trains are expressible. */
-        private const val SERVICE_DAY_MAX_MINUTES = 27 * 60 - 1
-
         /**
          * How long a "leave now" notification stays in the shade after the train has actually
          * left. Past that it is only telling the user about a train they have missed.
          */
         private const val LEAVE_GRACE_MS = 60_000L * 10
         /**
-         * Fire the "leave" notification only if we're this close to the exact target time
-         * ([leaveAtMs] / [notifyAt]). The main firing mechanism is now a precise WorkManager
-         * wakeup scheduled by [PreciseNotificationScheduler], so this window is just a safety net
-         * for late ticks. Keeping it tight avoids firing a "leave in 12 min" notification 30+
-         * minutes off target.
+         * Fire the notification only if we're this close to the exact target time ([notifyAt]).
+         * The main firing mechanism is a precise WorkManager wakeup scheduled by
+         * [PreciseNotificationScheduler], so this window is just a safety net for late ticks.
+         * Keeping it tight avoids firing a "leave in 12 min" notification 30+ minutes off target.
+         *
+         * The commute path does not use this: it goes through [isLeaveAlertDue], which shares one
+         * figure with the trip selection that feeds it. Those two drifting apart is what made
+         * commute alerts unpostable.
          */
         private const val WINDOW_MS = 60_000L * 5
         private const val ARRIVAL_WINDOW_MS = 60_000L * 5
