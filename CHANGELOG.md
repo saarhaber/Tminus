@@ -12,11 +12,18 @@ All notable changes to tMinus are recorded here. The format follows
   was baked at post time and wrong a minute later, into a chronometer in the notification header.
   That also removes the reason `setWhen` had to be left unset: there is one countdown now instead
   of two drifting apart.
-- "Time to leave" alerts carry `Snooze 5 min` and `Mute today`. A snooze that would land after the
-  train has departed is dropped rather than posted; muting applies to the rest of the current
-  *service* day, so muting at 00:30 mutes the commute already in progress.
+- "Time to leave" alerts carry `Snooze 5 min` and `Mute today`. `Snooze 5 min` appears only when the
+  train is more than five minutes away, so it is never offered when it could not come back in time;
+  muting applies to the rest of the current *service* day, so muting at 00:30 mutes the commute
+  already in progress.
 
 ### Fixed
+
+- `Snooze 5 min` did nothing on frequent routes. The alert fires close to departure, a five-minute
+  snooze would have landed after the train had gone, and the snooze was then dropped without
+  dismissing the notification — so the button looked broken. It is no longer offered in that case,
+  and if the train becomes imminent between the alert arriving and the tap, the alert is at least
+  dismissed instead of sitting there unchanged.
 
 - Widgets stayed on "Tap to set up" after being configured. Glance's `update()` only recomposes
   already-registered content, so configuration read before `provideContent` was never refreshed for

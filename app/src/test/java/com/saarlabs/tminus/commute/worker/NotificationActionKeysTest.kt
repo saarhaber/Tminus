@@ -2,6 +2,7 @@ package com.saarlabs.tminus.commute.worker
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -45,6 +46,26 @@ class NotificationActionKeysTest {
         val day2 = now + 24 * 60 * 60 * 1000L
         assertNotEquals(muteKey("a", now), muteKey("b", now))
         assertNotEquals(muteKey("a", now), muteKey("a", day2))
+    }
+
+    @Test
+    fun aSnoozeIsOfferedOnlyWhenItWouldLandBeforeTheTrainGoes() {
+        // The case that made the button dead on rapid transit: the alert fires a couple of minutes
+        // before a departure, so a five-minute snooze would come back after the train had gone.
+        assertFalse(snoozeLandsBeforeDeparture(departureMs = now + 2 * 60_000L, nowMs = now))
+        assertTrue(snoozeLandsBeforeDeparture(departureMs = now + 20 * 60_000L, nowMs = now))
+    }
+
+    @Test
+    fun aSnoozeLandingExactlyOnDepartureIsNotOffered() {
+        // Arriving at the moment the train leaves is no use, so the boundary is strict.
+        assertFalse(snoozeLandsBeforeDeparture(departureMs = now + SNOOZE_MS, nowMs = now))
+        assertTrue(snoozeLandsBeforeDeparture(departureMs = now + SNOOZE_MS + 1, nowMs = now))
+    }
+
+    @Test
+    fun aDepartureAlreadyPastIsNeverSnoozeable() {
+        assertFalse(snoozeLandsBeforeDeparture(departureMs = now - 60_000L, nowMs = now))
     }
 
     @Test
