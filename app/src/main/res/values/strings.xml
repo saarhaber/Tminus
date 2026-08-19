@@ -72,8 +72,10 @@
     <string name="commute_use_stops">Use these stops</string>
 
     <string name="notif_channel_commute">Commute alerts</string>
-    <string name="notif_leave_title_now">Departing now</string>
-    <string name="notif_leave_title_minutes">Departs in %1$d min</string>
+    <!-- The countdown is a live chronometer in the header, so the title stays put. -->
+    <string name="notif_leave_title">Time to leave</string>
+    <string name="notif_action_snooze">Snooze 5 min</string>
+    <string name="notif_action_mute_today">Mute today</string>
     <string name="notif_leave_text">%1$s → %2$s · %3$s</string>
     <string name="notif_arrival_title">Arriving</string>
     <string name="notif_arrival_text">%1$s · scheduled %2$s</string>

@@ -79,9 +79,12 @@ public class TminusNotificationWorker(
         val today = nowEt.local.date
         val todayDow = isoDayOfWeek(today)
 
+        val serviceDateMs = NotificationActionReceiver.currentServiceDateMs(nowEt)
+
         for (profile in profiles) {
             if (profile.daysOfWeek.isEmpty()) continue
             if (!profile.daysOfWeek.contains(todayDow)) continue
+            if (prefs.contains(muteKey(profile.id, serviceDateMs))) continue
 
             val fromStop = global.getStop(profile.fromStopId) ?: continue
             val toStop = global.getStop(profile.toStopId) ?: continue
@@ -127,8 +130,12 @@ public class TminusNotificationWorker(
             val leaveAtMs = trip.departureTime.toEpochMilliseconds() - leadMs
             val nowMs = nowEt.toEpochMilliseconds()
 
-            if (leaveAtMs <= nowMs && nowMs < leaveAtMs + WINDOW_MS) {
-                if (!prefs.contains(leaveKey)) {
+            // A due snooze re-posts the alert even though the original window has passed, and
+            // even though the leave marker says it was already delivered — the user asked for it
+            // again.
+            val snoozed = dueSnoozeKey(prefs.all, profile.id, nowMs)
+            if ((leaveAtMs <= nowMs && nowMs < leaveAtMs + WINDOW_MS) || snoozed != null) {
+                if (snoozed != null || !prefs.contains(leaveKey)) {
                     val toName = plainStopLabel(profile.toLabel, trip.toStop, res)
                     val departureLine =
                         clockWithTrack(
@@ -147,30 +154,26 @@ public class TminusNotificationWorker(
                         notify(
                             id = leaveKey.hashCode(),
                             channelId = TminusNotificationChannels.COMMUTE,
-                            // The countdown is the whole point of the notification, so it is the
-                            // title rather than the tail of a sentence the shade may truncate.
-                            title =
-                                if (trip.minutesUntil <= 0) {
-                                    applicationContext.getString(R.string.notif_leave_title_now)
-                                } else {
-                                    applicationContext.getString(
-                                        R.string.notif_leave_title_minutes,
-                                        trip.minutesUntil,
-                                    )
-                                },
+                            // The minute count moved out of the title and into a live chronometer
+                            // in the header. A title baked at post time is wrong a minute later,
+                            // and it was the reason `whenMs` had to be left unset: two countdowns
+                            // on one notification drift apart. There is only one now, and it ticks.
+                            title = applicationContext.getString(R.string.notif_leave_title),
                             text = stopsAndTime,
                             bigText = "$stopsAndTime\n${trip.route.label}",
                             subText = profile.name,
                             accentArgb = argbFromHexOrNull(trip.route.color),
-                            // Deliberately no `whenMs`. Android renders a future timestamp as its
-                            // own relative countdown, recomputed as the shade redraws, which put
-                            // "Departs in 6 min" beside a header reading "in 5m". The departure is
-                            // already in the body as a clock time, where it cannot drift out of
-                            // step with the title.
+                            countDownToMs = trip.departureTime.toEpochMilliseconds(),
+                            actions =
+                                commuteActions(
+                                    profileId = profile.id,
+                                    departureMs = trip.departureTime.toEpochMilliseconds(),
+                                ),
                             timeoutAtMs =
                                 trip.departureTime.toEpochMilliseconds() + LEAVE_GRACE_MS,
                         )
                     if (posted) markDelivered(prefs, leaveKey, nowMs)
+                    snoozed?.let { prefs.edit().remove(it).apply() }
                 }
             } else if (leaveAtMs > nowMs) {
                 // Schedule a precise wakeup at the exact leave time so the notification arrives
@@ -467,9 +470,17 @@ public class TminusNotificationWorker(
         subText: String? = null,
         accentArgb: Int? = null,
         whenMs: Long? = null,
+        /**
+         * Departure to count down to in the header, as a live chronometer.
+         *
+         * Mutually exclusive with a countdown in [title]: two countdowns on one notification drift
+         * apart as the shade redraws, which is why [whenMs] alone was previously left unset.
+         */
+        countDownToMs: Long? = null,
         timeoutAtMs: Long? = null,
         category: String = NotificationCompat.CATEGORY_REMINDER,
         priority: Int = NotificationCompat.PRIORITY_HIGH,
+        actions: List<NotificationActionSpec> = emptyList(),
     ): Boolean {
         // Inline rather than delegated to a helper so lint can see the guard, and because Android
         // 13+ silently drops notifications without this permission — recording them as "delivered"
@@ -512,6 +523,16 @@ public class TminusNotificationWorker(
         if (whenMs != null) {
             builder.setWhen(whenMs).setShowWhen(true)
         }
+        // A chronometer ticks on its own, so the header stays true between redraws instead of
+        // going stale the moment it is posted. It replaces the minute count in the title rather
+        // than joining it — see [countDownToMs].
+        if (countDownToMs != null) {
+            builder
+                .setWhen(countDownToMs)
+                .setShowWhen(true)
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+        }
         // "Leave in 12 min" is wrong once the train has gone; let it retire itself rather than sit
         // in the shade until the user swipes it.
         timeoutAtMs?.let { at ->
@@ -519,9 +540,35 @@ public class TminusNotificationWorker(
             if (remaining > 0) builder.setTimeoutAfter(remaining)
         }
 
+        for (spec in actions) {
+            builder.addAction(
+                0,
+                applicationContext.getString(spec.labelRes),
+                NotificationActionReceiver.pendingIntent(applicationContext, id, spec),
+            )
+        }
+
         NotificationManagerCompat.from(applicationContext).notify(id, builder.build())
         return true
     }
+
+    private fun commuteActions(profileId: String, departureMs: Long): List<NotificationActionSpec> =
+        listOf(
+            NotificationActionSpec(
+                action = NotificationActionReceiver.ACTION_SNOOZE,
+                labelRes = R.string.notif_action_snooze,
+                extras =
+                    mapOf(
+                        NotificationActionReceiver.EXTRA_PROFILE_ID to profileId,
+                        NotificationActionReceiver.EXTRA_DEPARTURE_MS to departureMs.toString(),
+                    ),
+            ),
+            NotificationActionSpec(
+                action = NotificationActionReceiver.ACTION_MUTE_TODAY,
+                labelRes = R.string.notif_action_mute_today,
+                extras = mapOf(NotificationActionReceiver.EXTRA_PROFILE_ID to profileId),
+            ),
+        )
 
     /** Records that a notification went out, so the next run stays quiet about the same event. */
     private fun markDelivered(

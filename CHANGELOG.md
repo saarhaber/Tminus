@@ -6,6 +6,16 @@ All notable changes to tMinus are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The "time to leave" alert now counts down live. The minute count moved out of the title, which
+  was baked at post time and wrong a minute later, into a chronometer in the notification header.
+  That also removes the reason `setWhen` had to be left unset: there is one countdown now instead
+  of two drifting apart.
+- "Time to leave" alerts carry `Snooze 5 min` and `Mute today`. A snooze that would land after the
+  train has departed is dropped rather than posted; muting applies to the rest of the current
+  *service* day, so muting at 00:30 mutes the commute already in progress.
+
 ### Fixed
 
 - Widgets stayed on "Tap to set up" after being configured. Glance's `update()` only recomposes
