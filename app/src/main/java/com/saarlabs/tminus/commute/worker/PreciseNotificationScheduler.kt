@@ -1,6 +1,7 @@
 package com.saarlabs.tminus.commute.worker
 
 import android.content.Context
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
@@ -23,16 +24,28 @@ internal object PreciseNotificationScheduler {
     /** Don't schedule for events in the past or extremely near-future (periodic tick handles those). */
     private const val MIN_LEAD_MS = 60_000L
 
+    /**
+     * Queue a wakeup for [tag]'s event, replacing any wakeup already queued for it.
+     *
+     * The periodic worker re-plans the same trip on every tick, so this is called repeatedly for
+     * one departure. Plain `enqueue` gave each call its own work request: a single arrival had
+     * four wakeups queued against it in testing, and each one wakes the process and re-runs the
+     * whole worker — MBTA fetches included — only for the delivery marker to discard the result.
+     * Keying the work by [tag] collapses those to one, and REPLACE keeps the newest trigger time
+     * when a schedule shifts.
+     */
     fun scheduleAt(context: Context, tag: String, triggerAtMs: Long) {
         val nowMs = System.currentTimeMillis()
         val delayMs = triggerAtMs - nowMs
         if (delayMs < MIN_LEAD_MS || delayMs > MAX_LOOKAHEAD_MS) return
+        val uniqueName = TAG_PREFIX + tag
         val work =
             OneTimeWorkRequestBuilder<TminusNotificationWorker>()
                 .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
-                .addTag(TAG_PREFIX + tag)
+                .addTag(uniqueName)
                 .build()
-        WorkManager.getInstance(context.applicationContext).enqueue(work)
+        WorkManager.getInstance(context.applicationContext)
+            .enqueueUniqueWork(uniqueName, ExistingWorkPolicy.REPLACE, work)
     }
 
     private const val TAG_PREFIX = "tminus_precise_"

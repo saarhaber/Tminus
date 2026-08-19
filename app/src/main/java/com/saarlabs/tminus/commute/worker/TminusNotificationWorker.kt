@@ -12,6 +12,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.saarlabs.tminus.model.response.ApiResult
+import com.saarlabs.tminus.network.ALERT_ACTIVITIES_ACCESSIBILITY
 import com.saarlabs.tminus.util.EasternTimeInstant
 import com.saarlabs.tminus.AppGraph
 import com.saarlabs.tminus.MainActivity
@@ -126,7 +127,6 @@ public class TminusNotificationWorker(
 
             if (leaveAtMs <= nowMs && nowMs < leaveAtMs + WINDOW_MS) {
                 if (!prefs.contains(leaveKey)) {
-                    markDelivered(prefs, leaveKey, nowMs)
                     val toName = profile.toLabel.ifBlank { trip.toStop.name }
                     val departureLine =
                         clockWithTrack(
@@ -141,27 +141,34 @@ public class TminusNotificationWorker(
                             toName,
                             departureLine,
                         )
-                    notify(
-                        id = leaveKey.hashCode(),
-                        channelId = TminusNotificationChannels.COMMUTE,
-                        // The countdown is the whole point of the notification, so it is the title
-                        // rather than the tail of a sentence the shade may truncate.
-                        title =
-                            if (trip.minutesUntil <= 0) {
-                                applicationContext.getString(R.string.notif_leave_title_now)
-                            } else {
-                                applicationContext.getString(
-                                    R.string.notif_leave_title_minutes,
-                                    trip.minutesUntil,
-                                )
-                            },
-                        text = stopsAndTime,
-                        bigText = "$stopsAndTime\n${trip.route.label}",
-                        subText = profile.name,
-                        accentArgb = argbFromHexOrNull(trip.route.color),
-                        whenMs = trip.departureTime.toEpochMilliseconds(),
-                        timeoutAtMs = trip.departureTime.toEpochMilliseconds() + LEAVE_GRACE_MS,
-                    )
+                    val posted =
+                        notify(
+                            id = leaveKey.hashCode(),
+                            channelId = TminusNotificationChannels.COMMUTE,
+                            // The countdown is the whole point of the notification, so it is the
+                            // title rather than the tail of a sentence the shade may truncate.
+                            title =
+                                if (trip.minutesUntil <= 0) {
+                                    applicationContext.getString(R.string.notif_leave_title_now)
+                                } else {
+                                    applicationContext.getString(
+                                        R.string.notif_leave_title_minutes,
+                                        trip.minutesUntil,
+                                    )
+                                },
+                            text = stopsAndTime,
+                            bigText = "$stopsAndTime\n${trip.route.label}",
+                            subText = profile.name,
+                            accentArgb = argbFromHexOrNull(trip.route.color),
+                            // Deliberately no `whenMs`. Android renders a future timestamp as its
+                            // own relative countdown, recomputed as the shade redraws, which put
+                            // "Departs in 6 min" beside a header reading "in 5m". The departure is
+                            // already in the body as a clock time, where it cannot drift out of
+                            // step with the title.
+                            timeoutAtMs =
+                                trip.departureTime.toEpochMilliseconds() + LEAVE_GRACE_MS,
+                        )
+                    if (posted) markDelivered(prefs, leaveKey, nowMs)
                 }
             } else if (leaveAtMs > nowMs) {
                 // Schedule a precise wakeup at the exact leave time so the notification arrives
@@ -178,26 +185,33 @@ public class TminusNotificationWorker(
                 val arrMs = trip.arrivalTime.toEpochMilliseconds()
                 if (arrMs <= nowMs && nowMs < arrMs + ARRIVAL_WINDOW_MS) {
                     if (!prefs.contains(arrivalKey)) {
-                        markDelivered(prefs, arrivalKey, nowMs)
                         val toName = profile.toLabel.ifBlank { trip.toStop.name }
-                        notify(
-                            id = arrivalKey.hashCode(),
-                            channelId = TminusNotificationChannels.COMMUTE,
-                            title = applicationContext.getString(R.string.notif_arrival_title),
-                            text =
-                                applicationContext.getString(
-                                    R.string.notif_arrival_text,
-                                    toName,
-                                    clockWithTrack(
-                                        applicationContext,
-                                        trip.arrivalTime.formatClock(use24Hour),
-                                        trip.toPlatform,
+                        val posted =
+                            notify(
+                                id = arrivalKey.hashCode(),
+                                channelId = TminusNotificationChannels.COMMUTE,
+                                title =
+                                    applicationContext.getString(R.string.notif_arrival_title),
+                                text =
+                                    applicationContext.getString(
+                                        R.string.notif_arrival_text,
+                                        toName,
+                                        clockWithTrack(
+                                            applicationContext,
+                                            trip.arrivalTime.formatClock(use24Hour),
+                                            trip.toPlatform,
+                                        ),
                                     ),
-                                ),
-                            subText = profile.name,
-                            accentArgb = argbFromHexOrNull(trip.route.color),
-                            whenMs = trip.arrivalTime.toEpochMilliseconds(),
-                        )
+                                subText = profile.name,
+                                accentArgb = argbFromHexOrNull(trip.route.color),
+                                whenMs = trip.arrivalTime.toEpochMilliseconds(),
+                                // An arrival ping is about a moment, not a standing state; retire
+                                // it on the same grace period the leave notification uses rather
+                                // than leaving it in the shade until it is swiped.
+                                timeoutAtMs =
+                                    trip.arrivalTime.toEpochMilliseconds() + LEAVE_GRACE_MS,
+                            )
+                        if (posted) markDelivered(prefs, arrivalKey, nowMs)
                     }
                 } else if (arrMs > nowMs) {
                     PreciseNotificationScheduler.scheduleAt(
@@ -267,7 +281,6 @@ public class TminusNotificationWorker(
 
             if (notifyAt <= nowMs && nowMs < notifyAt + WINDOW_MS) {
                 if (!prefs.contains(key)) {
-                    markDelivered(prefs, key, nowMs)
                     val modeLabel =
                         when (p.mode) {
                             LastTrainMode.LAST ->
@@ -276,23 +289,25 @@ public class TminusNotificationWorker(
                                 applicationContext.getString(R.string.notif_first_train_title)
                         }
                     val route = global.getRoute(p.routeId)
-                    notify(
-                        id = key.hashCode(),
-                        channelId = TminusNotificationChannels.LAST_TRAIN,
-                        title = modeLabel,
-                        // This line used to be `dep.local.toString().take(16)`, which put a raw
-                        // ISO timestamp ("2026-08-17T23:45") in front of the user and ignored the
-                        // 12/24-hour preference the app asks them to choose.
-                        text =
-                            applicationContext.getString(
-                                R.string.notif_last_train_text,
-                                label,
-                                dep.formatClock(use24Hour),
-                            ),
-                        subText = p.name,
-                        accentArgb = argbFromHexOrNull(route?.color),
-                        whenMs = dep.toEpochMilliseconds(),
-                    )
+                    val posted =
+                        notify(
+                            id = key.hashCode(),
+                            channelId = TminusNotificationChannels.LAST_TRAIN,
+                            title = modeLabel,
+                            // This line used to be `dep.local.toString().take(16)`, which put a raw
+                            // ISO timestamp ("2026-08-17T23:45") in front of the user and ignored
+                            // the 12/24-hour preference the app asks them to choose.
+                            text =
+                                applicationContext.getString(
+                                    R.string.notif_last_train_text,
+                                    label,
+                                    dep.formatClock(use24Hour),
+                                ),
+                            subText = p.name,
+                            accentArgb = argbFromHexOrNull(route?.color),
+                            whenMs = dep.toEpochMilliseconds(),
+                        )
+                    if (posted) markDelivered(prefs, key, nowMs)
                 }
             } else if (notifyAt > nowMs) {
                 PreciseNotificationScheduler.scheduleAt(
@@ -331,6 +346,11 @@ public class TminusNotificationWorker(
                 graph.client.fetchAlertsForRoute(
                     routeId = w.routeId,
                     stopIds = global.stopIdsForScheduleFilter(stop),
+                    // Without this the API applies its own BOARD/EXIT/RIDE default, which has no
+                    // overlap with how lift and escalator outages are recorded. The watch list
+                    // returned service alerts and never a single closure — the feature could not
+                    // fire at all.
+                    activities = ALERT_ACTIVITIES_ACCESSIBILITY,
                 )
             val alerts =
                 when (alertsResult) {
@@ -344,21 +364,22 @@ public class TminusNotificationWorker(
 
                 val key = "acc_${w.id}_${alert.id}"
                 if (prefs.contains(key)) continue
-                markDelivered(prefs, key, System.currentTimeMillis())
 
                 val route = global.getRoute(w.routeId)
-                notify(
-                    id = key.hashCode(),
-                    channelId = TminusNotificationChannels.ACCESSIBILITY,
-                    title = applicationContext.getString(R.string.notif_accessibility_title),
-                    // Alert headers run to a couple of sentences; BigTextStyle in [notify] is what
-                    // lets the whole thing be read instead of one ellipsised line.
-                    text = alert.header,
-                    subText = w.name,
-                    accentArgb = argbFromHexOrNull(route?.color),
-                    category = NotificationCompat.CATEGORY_STATUS,
-                    priority = NotificationCompat.PRIORITY_DEFAULT,
-                )
+                val posted =
+                    notify(
+                        id = key.hashCode(),
+                        channelId = TminusNotificationChannels.ACCESSIBILITY,
+                        title = applicationContext.getString(R.string.notif_accessibility_title),
+                        // Alert headers run to a couple of sentences; BigTextStyle in [notify] is
+                        // what lets the whole thing be read instead of one ellipsised line.
+                        text = alert.header,
+                        subText = w.name,
+                        accentArgb = argbFromHexOrNull(route?.color),
+                        category = NotificationCompat.CATEGORY_STATUS,
+                        priority = NotificationCompat.PRIORITY_DEFAULT,
+                    )
+                if (posted) markDelivered(prefs, key, System.currentTimeMillis())
             }
         }
     }
@@ -409,6 +430,10 @@ public class TminusNotificationWorker(
      * colour now goes where Android expects an app accent — [NotificationCompat.Builder.setColor],
      * which tints the small icon and header — and the body is a plain big-text style so a long
      * service alert expands instead of being cut off at one line.
+     *
+     * Returns whether the notification actually reached the shade. Callers record a delivery
+     * marker only on `true`: a run that is dropped for want of POST_NOTIFICATIONS must stay
+     * retryable, and a marker written regardless would silence the event for good.
      */
     private fun notify(
         id: Int,
@@ -422,7 +447,7 @@ public class TminusNotificationWorker(
         timeoutAtMs: Long? = null,
         category: String = NotificationCompat.CATEGORY_REMINDER,
         priority: Int = NotificationCompat.PRIORITY_HIGH,
-    ) {
+    ): Boolean {
         // Inline rather than delegated to a helper so lint can see the guard, and because Android
         // 13+ silently drops notifications without this permission — recording them as "delivered"
         // would suppress the retry.
@@ -432,7 +457,7 @@ public class TminusNotificationWorker(
                 Manifest.permission.POST_NOTIFICATIONS,
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            return
+            return false
         }
         val intent = Intent(applicationContext, MainActivity::class.java)
         val pi =
@@ -472,6 +497,7 @@ public class TminusNotificationWorker(
         }
 
         NotificationManagerCompat.from(applicationContext).notify(id, builder.build())
+        return true
     }
 
     /** Records that a notification went out, so the next run stays quiet about the same event. */

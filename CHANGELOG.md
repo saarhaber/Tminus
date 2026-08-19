@@ -51,6 +51,22 @@ All notable changes to tMinus are recorded here. The format follows
   at the end of their key, which is an epoch for trip alerts but an MBTA alert id for these — read
   as a timestamp, six digits is January 1970, so the marker was always already expired. Markers now
   record when they were delivered, and service alerts keep theirs for 30 days rather than 3.
+- Elevator and escalator alerts never notified at all. The V3 alerts endpoint applies its own
+  `filter[activity]` default of `BOARD,EXIT,RIDE` when the parameter is absent, and lift and
+  escalator outages are filed under `USING_WHEELCHAIR` and `USING_ESCALATOR` — so the station watch
+  fetched alerts for the right route and stops and the closures were filtered out before the app
+  ever saw them. The accessibility query now names the activities it needs, restating the defaults
+  it replaces so ordinary stop closures keep arriving.
+- A notification dropped for want of notification permission was still recorded as delivered, so the
+  event stayed silent for good once permission was granted. Delivery is now recorded only after the
+  notification reaches the shade.
+- Each periodic run queued another exact wakeup for the same departure — four for one arrival in
+  testing — and every one of them woke the process and re-ran the worker, MBTA fetches included,
+  only for the delivery marker to throw the result away. Wakeups are now keyed per event.
+- "Time to leave" showed two countdowns that disagreed: the title's minutes were computed when the
+  worker ran, while Android rendered the notification's timestamp as its own live relative time, so
+  "Departs in 6 min" sat beside a header reading "in 5m". The departure remains in the body as a
+  clock time, which cannot drift out of step.
 
 ### Changed
 
@@ -58,8 +74,7 @@ All notable changes to tMinus are recorded here. The format follows
   the whole notification in the route colour and hard-coded the text colours, which ignored dark
   mode, Material You and font settings, and clipped long alert text to one line. The line colour now
   tints the notification the way Android expects, long text expands, and each alert carries the
-  commute or watch name as its sub-text, the scheduled time as its timestamp, and its track where
-  there is one. "Time to leave" leads with the countdown and retires itself ten minutes after the
+  commute or watch name as its sub-text and its track where there is one. "Time to leave" leads with the countdown and retires itself ten minutes after the
   train has gone.
 - The next trip widget (subway, bus and ferry) was relaid out. "min" now sits on the countdown's
   baseline instead of on the body's next line, where it drifted away from its own digits as the

@@ -40,6 +40,16 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
+ * `filter[activity]` for a caller that wants station-access alerts.
+ *
+ * The lift and escalator activities are the whole point, but the API replaces its default set
+ * rather than adding to it, so `BOARD`/`EXIT`/`RIDE` have to be restated or an ordinary stop
+ * closure stops coming back.
+ */
+public val ALERT_ACTIVITIES_ACCESSIBILITY: List<String> =
+    listOf("BOARD", "EXIT", "RIDE", "USING_WHEELCHAIR", "USING_ESCALATOR")
+
+/**
  * MBTA V3 JSON:API ([https://www.mbta.com/developers/v3-api](https://www.mbta.com/developers/v3-api)).
  * Optional [apiKey] maps to the V3 portal ([https://api-v3.mbta.com/](https://api-v3.mbta.com/)).
  */
@@ -486,10 +496,18 @@ public class MbtaV3Client(private val apiKey: String?) {
      * fetching every alert on the route and testing whether its headline mentions the station name —
      * both misses alerts (headlines do not always name the stop) and fires on unrelated ones
      * (tokens like "Street", "Square" and "Center" appear all over the network).
+     *
+     * [activities] maps to `filter[activity]`. Leaving it empty is **not** the same as asking for
+     * everything: the V3 API applies its own default of `BOARD,EXIT,RIDE` when the parameter is
+     * absent, and lift and escalator outages are recorded against `USING_WHEELCHAIR` and
+     * `USING_ESCALATOR` instead. An accessibility caller that omits this gets a response that never
+     * contains a single `ELEVATOR_CLOSURE`, no matter how many are live — see
+     * [ALERT_ACTIVITIES_ACCESSIBILITY].
      */
     public suspend fun fetchAlertsForRoute(
         routeId: String,
         stopIds: List<String> = emptyList(),
+        activities: List<String> = emptyList(),
     ): ApiResult<List<com.saarlabs.tminus.model.response.MbtaAlertSummary>> =
         withContext(Dispatchers.IO) {
             try {
@@ -501,6 +519,9 @@ public class MbtaV3Client(private val apiKey: String?) {
                         parameter("filter[route]", routeId)
                         if (stopIds.isNotEmpty()) {
                             parameter("filter[stop]", stopIds.joinToString(","))
+                        }
+                        if (activities.isNotEmpty()) {
+                            parameter("filter[activity]", activities.joinToString(","))
                         }
                     },
                 ) { doc ->
