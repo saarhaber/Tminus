@@ -165,6 +165,7 @@ public class TminusNotificationWorker(
                                 commuteActions(
                                     profileId = profile.id,
                                     departureMs = trip.departureTime.toEpochMilliseconds(),
+                                    nowMs = nowMs,
                                 ),
                             timeoutAtMs =
                                 trip.departureTime.toEpochMilliseconds() + LEAVE_GRACE_MS,
@@ -542,8 +543,16 @@ public class TminusNotificationWorker(
         return true
     }
 
-    private fun commuteActions(profileId: String, departureMs: Long): List<NotificationActionSpec> =
-        listOf(
+    private fun commuteActions(
+        profileId: String,
+        departureMs: Long,
+        nowMs: Long,
+    ): List<NotificationActionSpec> =
+        listOfNotNull(
+            // Offered only when it can actually happen. On a short-headway route the next train is
+            // routinely closer than the snooze interval, and a button that silently does nothing
+            // is worse than no button — the receiver would drop the snooze and the alert would sit
+            // there looking unchanged.
             NotificationActionSpec(
                 action = NotificationActionReceiver.ACTION_SNOOZE,
                 labelRes = R.string.notif_action_snooze,
@@ -552,7 +561,7 @@ public class TminusNotificationWorker(
                         NotificationActionReceiver.EXTRA_PROFILE_ID to profileId,
                         NotificationActionReceiver.EXTRA_DEPARTURE_MS to departureMs.toString(),
                     ),
-            ),
+            ).takeIf { snoozeLandsBeforeDeparture(departureMs, nowMs) },
             NotificationActionSpec(
                 action = NotificationActionReceiver.ACTION_MUTE_TODAY,
                 labelRes = R.string.notif_action_mute_today,

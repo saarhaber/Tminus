@@ -40,15 +40,20 @@ internal class NotificationActionReceiver : BroadcastReceiver() {
                 // which would silently yield 0 and drop every snooze.
                 val departureMs =
                     intent.getStringExtra(EXTRA_DEPARTURE_MS)?.toLongOrNull() ?: return
-                val fireAtMs = nowMs + SNOOZE_MS
-                // A train that has already gone is not worth waking someone for.
-                if (departureMs <= fireAtMs) return
-                prefs.edit().putLong(snoozeKey(profileId, fireAtMs), fireAtMs).apply()
-                PreciseNotificationScheduler.scheduleAt(
-                    context,
-                    tag = snoozeKey(profileId, fireAtMs),
-                    triggerAtMs = fireAtMs,
-                )
+                // A train that leaves before the snooze would land is not worth waking someone
+                // for. Note this does *not* return: the button was tapped, so it has to do
+                // something visible, and falling through cancels the alert. The action is
+                // normally not offered at all in this case — see `commuteActions` — so this only
+                // catches the train becoming imminent between posting and the tap.
+                if (snoozeLandsBeforeDeparture(departureMs, nowMs)) {
+                    val fireAtMs = nowMs + SNOOZE_MS
+                    prefs.edit().putLong(snoozeKey(profileId, fireAtMs), fireAtMs).apply()
+                    PreciseNotificationScheduler.scheduleAt(
+                        context,
+                        tag = snoozeKey(profileId, fireAtMs),
+                        triggerAtMs = fireAtMs,
+                    )
+                }
             }
 
             ACTION_MUTE_TODAY ->
@@ -71,8 +76,6 @@ internal class NotificationActionReceiver : BroadcastReceiver() {
         const val EXTRA_DEPARTURE_MS = "departure_ms"
 
         const val PREFS_STATE = "tminus_notif_state"
-
-        private const val SNOOZE_MS = 5 * 60_000L
 
         internal fun pendingIntent(
             context: Context,
@@ -109,6 +112,20 @@ internal class NotificationActionReceiver : BroadcastReceiver() {
                 .toEpochMilliseconds()
     }
 }
+
+/** How far ahead "Snooze 5 min" pushes the alert. */
+internal const val SNOOZE_MS: Long = 5 * 60_000L
+
+/**
+ * Whether a snooze taken at [nowMs] would still land before [departureMs].
+ *
+ * One rule, two callers, deliberately: the worker asks it at post time so it never offers a snooze
+ * that cannot happen, and the receiver asks it again on tap because the train moves closer in
+ * between. It matters most on short-headway routes, where the next departure is routinely nearer
+ * than the snooze interval — offering a button there that silently did nothing was the bug.
+ */
+internal fun snoozeLandsBeforeDeparture(departureMs: Long, nowMs: Long): Boolean =
+    departureMs > nowMs + SNOOZE_MS
 
 /** Marker for "this profile is muted for the rest of the service day". */
 internal fun muteKey(profileId: String, serviceDateMs: Long): String =
