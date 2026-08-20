@@ -8,6 +8,10 @@ All notable changes to tMinus are recorded here. The format follows
 
 ### Changed
 
+- Home-screen departures show the whole headsign. A destination carrying a parenthetical qualifier
+  — "South Station (Express to Boston Landing after Wellesley Farms)" — was clipped after two lines,
+  hiding the part that says which stops the train skips. The qualifier is now a second, smaller line
+  and neither half ellipses.
 - The "time to leave" alert now counts down live. The minute count moved out of the title, which
   was baked at post time and wrong a minute later, into a chronometer in the notification header.
   That also removes the reason `setWhen` had to be left unset: there is one countdown now instead
