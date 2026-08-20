@@ -179,6 +179,11 @@ private fun DepartureRow(departure: WidgetStationBoardDeparture, use24Hour: Bool
     val clock = departure.departureTime.formatClock(use24Hour)
     val track = departure.platform?.let { stringResource(R.string.widget_track_short, it) }
     val clockLine = track?.let { "$clock · $it" } ?: clock
+    // Headsigns like "South Station (Express to Boston Landing after Wellesley Farms)" are far
+    // longer than the row is wide. Both halves wrap in full rather than ellipsing: the qualifier
+    // is what tells the rider the train skips their stop.
+    val (destination, qualifier) =
+        remember(departure.headsign) { splitHeadsign(departure.headsign) }
 
     Row(
         modifier =
@@ -212,13 +217,19 @@ private fun DepartureRow(departure: WidgetStationBoardDeparture, use24Hour: Bool
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text = departure.headsign,
+                text = destination,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.fillMaxWidth(),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
+            if (qualifier != null) {
+                Text(
+                    text = qualifier,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
@@ -251,4 +262,25 @@ internal fun HomeBoardsLoading(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * Splits an MBTA headsign into its destination and any trailing parenthetical qualifier, e.g.
+ * "South Station (Express to Boston Landing after Wellesley Farms)" becomes
+ * "South Station" plus "Express to Boston Landing after Wellesley Farms".
+ *
+ * The qualifier is real information — it tells a rider which stops the train skips — but it is
+ * several times longer than the destination, so it is rendered separately rather than clipped.
+ * Only a qualifier that closes at the very end of the string is split off; anything else is left
+ * alone so an unbalanced headsign is never silently reshaped.
+ */
+internal fun splitHeadsign(headsign: String): Pair<String, String?> {
+    val trimmed = headsign.trim()
+    if (!trimmed.endsWith(")")) return trimmed to null
+    val open = trimmed.indexOf('(')
+    if (open <= 0) return trimmed to null
+    val destination = trimmed.substring(0, open).trim()
+    val qualifier = trimmed.substring(open + 1, trimmed.length - 1).trim()
+    if (destination.isEmpty() || qualifier.isEmpty()) return trimmed to null
+    return destination to qualifier
 }
